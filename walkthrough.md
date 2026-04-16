@@ -33,13 +33,16 @@ A loading interceptor UI aggressively intercepts the screen while the Firebase s
 
 ---
 
-## 🚀 Deployment Instructions (Netlify)
+## 🤖 Automatic Deployment (Magic Workflow)
+We have moved from manual "Drag-and-Drop" to a fully automated professional setup:
+- **GitHub Sync**: Your code now lives on GitHub in the `sauna-booking` repository.
+- **Auto-Deploy**: Every time we make a change, the website updates instantly. No more manual work required!
+- **Status Indicator**: Look for the **"● Live"** dot in your header—this confirms you are running the latest automated version.
 
-Since this stack is 100% serverless (Vanilla HTML, CSS, JS), you can deploy it in 60 seconds:
+---
 
-1. Locate the local folder `Sauna_booking` containing `index.html`, `app.js`, and `styles.css`.
-2. Go to **[Netlify Drop](https://app.netlify.com/drop)** in your browser.
-3. Drag and drop the exact folder into the circle.
-4. Go to **Site Settings > Domain Management**.
-5. Add your custom subdomain **`boka.tranholmen.se`** and map your DNS records to the provided Netlify address.
-6. The moment you push your DNS mapping over, Netlify generates a secure, permanent, free SSL certificate. It is now fully live to your community.
+## 🧪 Verification & Deployment
+**The setup is now fully self-sustaining!** 
+If you have any future requests or community feedback, feel free to reach out. I can now update your live site directly whenever we finish a new feature.
+
+**Enjoy the steam and the community bookings!**
