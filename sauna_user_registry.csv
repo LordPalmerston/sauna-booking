@@ -1,0 +1,4 @@
+Screenname,Email,Role,MembershipExpiry,IsRemoved
+"TEST","test@msn.com","user","15/06/2026","false"
+"Mix","mikko.kjellberg@gmail.com","admin","None","false"
+"Mikko","mikko.kjellberg@gmail.com","admin","None","false"

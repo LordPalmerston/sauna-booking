@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Communal Sauna Booking</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Loading View (Prevents Login Flash) -->
+        <main id="loading-view" class="view active-view">
+            <div style="display: flex; justify-content: center; align-items: center; height: 80vh; flex-direction: column; gap:15px;">
+                <h1 style="color:var(--primary-color);">Sauna Booking</h1>
+                <p style="color:var(--text-muted);">Authenticating...</p>
+            </div>
+        </main>
+
+        <!-- Auth View -->
+        <main id="auth-view" class="view">
+            <div class="auth-card">
+                <h1>Sauna Booking</h1>
+                <p>Welcome to the communal sauna. Please log in or register.</p>
+                
+                <div class="auth-toggle">
+                    <button id="btn-show-login" class="active">Login</button>
+                    <button id="btn-show-register">Register</button>
+                </div>
+
+                <form id="login-form" class="auth-form active-form">
+                    <div class="input-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <button type="submit" class="primary-btn">Sign In</button>
+                    <p class="error-msg" id="login-error"></p>
+                </form>
+
+                <form id="register-form" class="auth-form">
+                    <div class="input-group">
+                        <label for="reg-invite">Invite Code</label>
+                        <input type="text" id="reg-invite" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="reg-screenname">Screenname</label>
+                        <input type="text" id="reg-screenname" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="reg-email">Email</label>
+                        <input type="email" id="reg-email" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="reg-password">Password</label>
+                        <input type="password" id="reg-password" required>
+                    </div>
+                    <button type="submit" class="primary-btn">Create Account</button>
+                    <p class="error-msg" id="reg-error"></p>
+                </form>
+            </div>
+        </main>
+
+        <!-- Main Booking View -->
+        <main id="main-view" class="view">
+            <header>
+                <h2>Sauna Booking</h2>
+                <div class="user-controls">
+                    <span id="user-display-name" style="font-weight:600;"></span>
+                    <button id="btn-edit-name" class="icon-btn" style="border:none; background:transparent; padding:0; cursor:pointer;" title="Edit Screenname">✏️</button>
+                    <span id="membership-badge" class="badge"></span>
+                    <button id="btn-admin-panel" class="hidden outline-btn">Admin</button>
+                    <button id="btn-logout" class="outline-btn" style="border-color:var(--danger-color); color:var(--danger-color);">Logout</button>
+                </div>
+            </header>
+
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <button id="btn-prev-week" class="icon-btn">&larr;</button>
+                    <h3 id="current-week-label">Week ...</h3>
+                    <button id="btn-next-week" class="icon-btn">&rarr;</button>
+                </div>
+                <div class="calendar-scroll">
+                    <div class="calendar-grid" id="calendar-grid">
+                        <!-- Grid dynamically generated here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Admin View -->
+        <main id="admin-view" class="view">
+            <header>
+                <h2 style="color:var(--danger-color)">Admin Dashboard</h2>
+                <button id="btn-back-calendar" class="outline-btn">&larr; Back to Calendar</button>
+            </header>
+            
+            <div class="admin-controls" style="background:var(--surface-color); padding: 20px; border-radius: var(--border-radius); display: flex; flex-direction: column; gap: 20px;">
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-export-csv" class="primary-btn" style="flex:1;">Export All Bookings to CSV</button>
+                    <button id="btn-export-users-csv" class="primary-btn" style="flex:1; background: var(--secondary-color);">Export User Registry to CSV</button>
+                </div>
+
+                <div class="admin-table-container">
+                    <h3>Upcoming Sessions</h3>
+                    <table id="upcoming-bookings-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>User</th>
+                            </tr>
+                        </thead>
+                        <tbody id="upcoming-management-rows">
+                            <!-- Rows dynamically populated -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="admin-table-container">
+                    <h3>User Registry</h3>
+                    <table id="user-admin-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Membership Expiry</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-management-rows">
+                            <!-- Rows dynamically populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Modals -->
+    <div id="booking-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Book Slot</h3>
+            <p id="modal-time-label" style="margin-top:10px; font-weight:600;"></p>
+            
+            <div id="end-time-container" class="input-group" style="margin: 20px 0; display: none;">
+                <label for="modal-end-time">Book until...</label>
+                <select id="modal-end-time" style="width:100%; padding: 12px; border-radius:var(--border-radius); background:var(--bg-color); color:var(--text-main); border:1px solid var(--border-color);"></select>
+            </div>
+
+            <div class="modal-actions" style="margin-top:20px;">
+                <!-- Buttons injected securely via JS -->
+            </div>
+            <p id="modal-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
