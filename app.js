@@ -60,6 +60,11 @@ const membershipBadge = document.getElementById('membership-badge');
 
 function formatEuroDate(date) {
     if (!date) return "";
+    // If it's already a YYYY-MM-DD string, just reformat it without Date object conversion to avoid timezone shifts
+    if (typeof date === 'string' && date.includes('-') && date.length === 10) {
+        const [y, m, d] = date.split('-');
+        return `${d}/${m}/${y}`;
+    }
     const d = date.toDate ? date.toDate() : new Date(date);
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 }
