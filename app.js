@@ -588,12 +588,35 @@ async function renderAdminUsers() {
     tbody.innerHTML = "<tr><td colspan='3'>Loading users...</td></tr>";
     try {
         const snap = await getDocs(collection(db, "users"));
+        
+        // Sort: Role first (Admins then Users), then Screenname alphabetically
+        const sortedUsers = snap.docs.map(docSnap => ({
+            uid: docSnap.id,
+            ...docSnap.data()
+        })).sort((a,b) => {
+            if (a.role !== b.role) return a.role.localeCompare(b.role);
+            return (a.screenname || '').localeCompare(b.screenname || '');
+        });
+
         tbody.innerHTML = "";
-        snap.forEach(docSnap => {
-            const u = docSnap.data();
-            const uid = docSnap.id;
+        let currentGroup = null;
+
+        sortedUsers.forEach(u => {
+            const uid = u.uid;
             const m = u.membership || { expiresAt: null, isRemoved: false };
             
+            // Add a group header if role changes
+            if (u.role !== currentGroup) {
+                currentGroup = u.role;
+                const separator = document.createElement('tr');
+                separator.innerHTML = `
+                    <td colspan="3" style="background:rgba(0,0,0,0.02); font-weight:700; color:var(--text-muted); font-size:0.7rem; text-transform:uppercase; border-bottom: 2px solid var(--border-color); padding: 15px 12px 5px 12px;">
+                        ${u.role}s
+                    </td>
+                `;
+                tbody.appendChild(separator);
+            }
+
             const tr = document.createElement('tr');
             if (m.isRemoved) tr.className = 'row-removed';
             
