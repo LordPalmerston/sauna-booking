@@ -597,21 +597,26 @@ async function renderAdminUsers() {
             tr.innerHTML = `
                 <td>
                     <div class="user-info">
-                        <strong>${u.screenname}</strong>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <strong>${u.screenname}</strong>
+                            ${m.isRemoved ? `<span style="font-size:0.6rem; background:var(--danger-color); color:white; padding:2px 6px; border-radius:4px;">RESTRICTED</span>` : ''}
+                        </div>
                         <span class="user-email">${u.email}</span>
                         <span style="font-size:0.6rem; color:var(--primary-color)">${u.role.toUpperCase()}</span>
                     </div>
                 </td>
                 <td>${expiryStr}</td>
                 <td>
-                    <div class="mgt-btn-group">
-                        <button class="mgt-btn primary" data-action="add" data-unit="year" data-id="${uid}">+1y</button>
-                        <button class="mgt-btn" data-action="sub" data-unit="year" data-id="${uid}">-1y</button>
-                        <button class="mgt-btn primary" data-action="add" data-unit="month" data-id="${uid}">+1m</button>
-                        <button class="mgt-btn" data-action="sub" data-unit="month" data-id="${uid}">-1m</button>
+                    <div class="mgt-btn-group" style="flex-wrap: wrap;">
+                        <div style="display:flex; gap:5px; width:100%; margin-bottom:5px;">
+                            <button class="mgt-btn primary" data-action="add" data-unit="year" data-id="${uid}">+1y</button>
+                            <button class="mgt-btn" data-action="sub" data-unit="year" data-id="${uid}">-1y</button>
+                            <button class="mgt-btn primary" data-action="add" data-unit="month" data-id="${uid}">+1m</button>
+                            <button class="mgt-btn" data-action="sub" data-unit="month" data-id="${uid}">-1m</button>
+                        </div>
                         ${m.isRemoved ? 
-                            `<button class="mgt-btn undo" data-action="restore" data-id="${uid}">Undo Remove</button>` : 
-                            `<button class="mgt-btn danger" data-action="remove" data-id="${uid}">Remove</button>`
+                            `<button class="mgt-btn undo" style="width:100%; background:#5D4037; color:white; border:none; padding:8px;" data-action="restore" data-id="${uid}">Undo Remove (Restore Access)</button>` : 
+                            `<button class="mgt-btn danger" style="width:100%; background:var(--danger-color); color:white; border:none; padding:8px;" data-action="remove" data-id="${uid}">Remove User (Block Access)</button>`
                         }
                     </div>
                 </td>
