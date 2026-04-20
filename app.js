@@ -193,7 +193,12 @@ function getStartOfWeek(offset = 0) {
     monday.setDate(monday.getDate() + (offset * 7));
     return monday;
 }
-function formatDate(date) { return date.toISOString().split('T')[0]; }
+function formatDate(date) { 
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
 
 document.getElementById('btn-prev-week').addEventListener('click', () => { currentWeekOffset--; initCalendar(); });
 document.getElementById('btn-next-week').addEventListener('click', () => { currentWeekOffset++; initCalendar(); });
@@ -378,14 +383,17 @@ if (existingBooking && existingBooking.userId !== currentUser.uid && currentRole
         newBookingTimesToBook = []; // Reset
 
         let maxSlots = 48; // Max possible per booking theoretically
-        const dObj = new Date(targetSlot.date);
+        const [y, m, d] = targetSlot.date.split('-').map(Number);
+        const dObj = new Date(y, m - 1, d);
         const dayOfWeek = dObj.getDay(); 
 
         // Apply Fri/Sat 1.5h (3 slots) limits 
         if (currentRole !== 'admin' && (dayOfWeek === 5 || dayOfWeek === 6)) {
             const weekendBookings = currentBookings.filter(b => {
-                const bd = new Date(b.date).getDay();
-                return b.userId === currentUser.uid && b.status !== 'maintenance' && (bd === 5 || bd === 6);
+                const [by, bm, bd_num] = b.date.split('-').map(Number);
+                const dayObj = new Date(by, bm - 1, bd_num);
+                const bd_day = dayObj.getDay();
+                return b.userId === currentUser.uid && b.status !== 'maintenance' && (bd_day === 5 || bd_day === 6);
             });
             maxSlots = Math.max(0, 3 - weekendBookings.length);
         }
