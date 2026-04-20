@@ -597,14 +597,31 @@ async function renderAdminUsers() {
     try {
         const snap = await getDocs(collection(db, "users"));
         
+        let totalUsers = 0;
+        let activeMembers = 0;
+        let restrictedUsers = 0;
+        const now = new Date();
+
         // Sort: Role first (Admins then Users), then Screenname alphabetically
-        const sortedUsers = snap.docs.map(docSnap => ({
-            uid: docSnap.id,
-            ...docSnap.data()
-        })).sort((a,b) => {
+        const sortedUsers = snap.docs.map(docSnap => {
+            const u = docSnap.data();
+            const uid = docSnap.id;
+            const m = u.membership || { expiresAt: null, isRemoved: false };
+            
+            totalUsers++;
+            if (m.isRemoved) restrictedUsers++;
+            else if (m.expiresAt && m.expiresAt.toDate() > now) activeMembers++;
+
+            return { uid, ...u };
+        }).sort((a,b) => {
             if (a.role !== b.role) return a.role.localeCompare(b.role);
             return (a.screenname || '').localeCompare(b.screenname || '');
         });
+
+        // Update stats UI
+        document.getElementById('stat-total-users').textContent = totalUsers;
+        document.getElementById('stat-active-members').textContent = activeMembers;
+        document.getElementById('stat-restricted-accounts').textContent = restrictedUsers;
 
         tbody.innerHTML = "";
         let currentGroup = null;

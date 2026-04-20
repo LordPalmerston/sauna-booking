@@ -107,6 +107,21 @@
                     <button id="btn-export-users-csv" class="primary-btn" style="flex:1; background: var(--secondary-color);">Export User Registry to CSV</button>
                 </div>
 
+                <div id="admin-stats-container" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">
+                    <div class="stat-card" style="background:#f8f9fa; padding: 15px; border-radius: 8px;">
+                        <div id="stat-total-users" style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">0</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total Users</div>
+                    </div>
+                    <div class="stat-card" style="background:#f8f9fa; padding: 15px; border-radius: 8px;">
+                        <div id="stat-active-members" style="font-size: 1.5rem; font-weight: 700; color: var(--success-color);">0</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Membership</div>
+                    </div>
+                    <div class="stat-card" style="background:#f8f9fa; padding: 15px; border-radius: 8px;">
+                        <div id="stat-restricted-accounts" style="font-size: 1.5rem; font-weight: 700; color: var(--danger-color);">0</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Restricted</div>
+                    </div>
+                </div>
+
                 <div class="admin-table-container">
                     <h3>Upcoming Sessions</h3>
                     <table id="upcoming-bookings-table">
