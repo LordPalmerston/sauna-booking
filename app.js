@@ -138,19 +138,13 @@ function updateMembershipUI(membership) {
     if (!membershipBadge) return;
     membershipBadge.className = 'badge';
     
-    if (!membership || !membership.expiresAt) {
-        membershipBadge.textContent = "No Membership";
-        membershipBadge.classList.add('none');
+    // Membership enforcement is currently paused
+    if (membership && membership.isRemoved) {
+        membershipBadge.textContent = "Access Restricted";
+        membershipBadge.classList.add('expired');
     } else {
-        const expiry = membership.expiresAt.toDate ? membership.expiresAt.toDate() : new Date(membership.expiresAt);
-        const now = new Date();
-        if (expiry < now) {
-            membershipBadge.textContent = `Expired ${formatEuroDate(expiry)}`;
-            membershipBadge.classList.add('expired');
-        } else {
-            membershipBadge.textContent = `Active until ${formatEuroDate(expiry)}`;
-            membershipBadge.classList.add('active');
-        }
+        membershipBadge.textContent = "Unlimited Access";
+        membershipBadge.classList.add('active');
     }
 }
 
@@ -329,15 +323,12 @@ window.handleSlotClick = function(el) {
     }
 }
 
-// Membership Enforcement
+// Membership Enforcement (Expiration bypassed - only check if Removed)
 if (currentRole !== 'admin' && !existingBooking) {
-    const isExpired = !currentMembership || !currentMembership.expiresAt || 
-                      (currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt)) < new Date();
-    
-    if (isExpired || currentMembership.isRemoved) {
-        modalTitle.textContent = "Membership Required";
-        modalTime.textContent = isExpired ? "Your membership has expired." : "Your account access has been restricted.";
-        modalErr.textContent = "Please contact the administrator to renew your membership.";
+    if (currentMembership && currentMembership.isRemoved) {
+        modalTitle.textContent = "Access Restricted";
+        modalTime.textContent = "Your account access has been restricted.";
+        modalErr.textContent = "Please contact the administrator for support.";
         endTimeContainer.style.display = "none";
         document.querySelector('.modal-actions').innerHTML = `<button id="btn-close-membership" class="primary-btn">Close</button>`;
         document.getElementById('btn-close-membership').addEventListener('click', () => modal.classList.remove('active'));
