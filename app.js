@@ -25,6 +25,7 @@ let currentRole = 'user';
 let currentMembership = null; // { expiresAt, isRemoved }
 let currentWeekOffset = 0;
 let unsubscribeBookings = null;
+let unsubscribeMyBookings = null;
 let currentBookings = []; 
 
 // Modal State
@@ -177,8 +178,10 @@ onAuthStateChanged(auth, async (user) => {
         btns.admin.classList.toggle('hidden', currentRole !== 'admin');
         switchView('main');
         initCalendar();
+        listenToMyBookings();
     } else {
         if (unsubscribeBookings) unsubscribeBookings();
+        if (unsubscribeMyBookings) unsubscribeMyBookings();
         currentUser = null; currentRole = 'user'; currentMembership = null;
         switchView('auth');
     }
@@ -236,6 +239,73 @@ function initCalendar() {
 }
 
 // === DATABASE SYNC ===
+function listenToMyBookings() {
+    if (unsubscribeMyBookings) unsubscribeMyBookings();
+    const q = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
+    
+    unsubscribeMyBookings = onSnapshot(q, (snapshot) => {
+        const todayStr = formatDate(new Date());
+        
+        const upcomingDocs = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(b => b.date >= todayStr)
+            .sort((a, b) => {
+                if (a.date !== b.date) return a.date.localeCompare(b.date);
+                return a.time.localeCompare(b.time);
+            });
+            
+        renderMyBookingsUI(upcomingDocs);
+    });
+}
+
+function renderMyBookingsUI(slots) {
+    const container = document.getElementById('my-upcoming-bookings');
+    const list = document.getElementById('my-bookings-list');
+    
+    if (!slots || slots.length === 0) {
+        container.style.display = 'block';
+        list.innerHTML = `<div style="color:var(--text-muted); font-size: 0.85rem; padding: 10px 0;">No upcoming bookings.</div>`;
+        return;
+    }
+    
+    container.style.display = 'block';
+    
+    const sessions = [];
+    let currentSession = null;
+    
+    slots.forEach(slot => {
+        if (slot.status === 'maintenance') return;
+        
+        const slotIndex = allTimes.indexOf(slot.time);
+        const nextTimeStr = allTimes[slotIndex + 1] || "24:00";
+        
+        if (currentSession && 
+            currentSession.date === slot.date && 
+            currentSession.endTime === slot.time) {
+            currentSession.endTime = nextTimeStr;
+        } else {
+            if (currentSession) sessions.push(currentSession);
+            currentSession = {
+                date: slot.date,
+                startTime: slot.time,
+                endTime: nextTimeStr
+            };
+        }
+    });
+    if (currentSession) sessions.push(currentSession);
+    
+    list.innerHTML = "";
+    sessions.forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'my-booking-card';
+        card.innerHTML = `
+            <div class="my-booking-date">${formatEuroDate(s.date)}</div>
+            <div class="my-booking-time">${s.startTime} - ${s.endTime}</div>
+        `;
+        list.appendChild(card);
+    });
+}
+
 function listenToBookings(monday) {
     if (unsubscribeBookings) unsubscribeBookings();
     const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
