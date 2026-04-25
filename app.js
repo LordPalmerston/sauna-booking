@@ -245,10 +245,20 @@ function listenToMyBookings() {
     
     unsubscribeMyBookings = onSnapshot(q, (snapshot) => {
         const todayStr = formatDate(new Date());
+        const now = new Date();
         
         const upcomingDocs = snapshot.docs
             .map(d => ({ id: d.id, ...d.data() }))
-            .filter(b => b.date >= todayStr)
+            .filter(b => {
+                if (b.date < todayStr) return false;
+                if (b.date === todayStr) {
+                    const [y, m, dNum] = b.date.split('-').map(Number);
+                    const [hrs, mins] = b.time.split(':').map(Number);
+                    const slotDateTime = new Date(y, m - 1, dNum, hrs, mins);
+                    if (slotDateTime < now) return false;
+                }
+                return true;
+            })
             .sort((a, b) => {
                 if (a.date !== b.date) return a.date.localeCompare(b.date);
                 return a.time.localeCompare(b.time);
@@ -334,6 +344,7 @@ function updateCalendarUI() {
     const days = [...new Set(Array.from(document.querySelectorAll('.cal-slot')).map(el => el.getAttribute('data-date')))];
     const times = allTimes.slice(0, 48);
 
+    const now = new Date();
     days.forEach(date => {
         let prevBooking = null;
         let prevSlotEl = null;
@@ -342,6 +353,15 @@ function updateCalendarUI() {
             const el = document.querySelector(`.cal-slot[data-date="${date}"][data-time="${t}"]`);
             if (!el) return;
 
+            const [y, m, dNum] = date.split('-').map(Number);
+            const [hrs, mins] = t.split(':').map(Number);
+            const slotDateTime = new Date(y, m - 1, dNum, hrs, mins);
+            const isPast = slotDateTime < now;
+
+            if (isPast && currentRole !== 'admin') {
+                el.classList.add('past-slot');
+            }
+
             const b = bMap[date] && bMap[date][t];
             if (b) {
                 if (b.status === 'maintenance') {
@@ -349,7 +369,11 @@ function updateCalendarUI() {
                     el.innerHTML = "Maintenance";
                 } else if (b.userId === currentUser.uid) {
                     el.classList.add('booked-me');
-                    el.innerHTML = `Booked by Me<div class="slot-label">(Click to delete)</div>`;
+                    if (isPast && currentRole !== 'admin') {
+                        el.innerHTML = `Booked by Me`;
+                    } else {
+                        el.innerHTML = `Booked by Me<div class="slot-label">(Click to delete)</div>`;
+                    }
                 } else {
                     el.classList.add('booked-other');
                     let txt = b.screenname;
@@ -375,6 +399,15 @@ function updateCalendarUI() {
 window.handleSlotClick = function(el) {
     const date = el.getAttribute('data-date');
     const time = el.getAttribute('data-time');
+    
+    const now = new Date();
+    const [y, m, dNum] = date.split('-').map(Number);
+    const [hrs, mins] = time.split(':').map(Number);
+    const slotDateTime = new Date(y, m - 1, dNum, hrs, mins);
+    const isPast = slotDateTime < now;
+
+    if (isPast && currentRole !== 'admin') return;
+
     targetSlot = { date, time };
     existingBooking = currentBookings.find(b => b.date === date && b.time === time);
     modalErr.textContent = "";
@@ -387,6 +420,13 @@ window.handleSlotClick = function(el) {
         // Trace backward
         for (let i = startIndex - 1; i >= 0; i--) {
             const checkTime = allTimes[i];
+            const [checkHrs, checkMins] = checkTime.split(':').map(Number);
+            const checkDateTime = new Date(y, m - 1, dNum, checkHrs, checkMins);
+            
+            if (checkDateTime < now && currentRole !== 'admin') {
+                break;
+            }
+
             const b = currentBookings.find(b => b.date === date && b.time === checkTime);
             if (b && b.userId === existingBooking.userId && b.status === existingBooking.status) {
                 targetBlockIds.push(b.id);

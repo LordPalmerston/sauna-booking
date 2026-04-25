@@ -205,6 +205,7 @@ header { display: flex; justify-content: space-between; align-items: center; mar
 .cal-slot.booked-me { background: var(--slot-booked-me); color: var(--text-main); font-weight: 600; }
 .cal-slot.booked-other { background: var(--slot-booked-other); color: var(--bg-color); cursor: not-allowed; }
 .cal-slot.maintenance { background: var(--slot-maintenance); color: var(--bg-color); cursor: not-allowed; }
+.cal-slot.past-slot { opacity: 0.6; cursor: not-allowed; }
 .cal-slot .slot-label { font-size: 0.75rem; margin-top: 2px; }
 
 /* Modal */
