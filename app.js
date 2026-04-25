@@ -358,8 +358,11 @@ function updateCalendarUI() {
             const slotDateTime = new Date(y, m - 1, dNum, hrs, mins);
             const isPast = slotDateTime < now;
 
-            if (isPast && currentRole !== 'admin') {
-                el.classList.add('past-slot');
+            if (isPast) {
+                el.innerHTML = "Passed";
+                if (currentRole !== 'admin') {
+                    el.classList.add('past-slot');
+                }
             }
 
             const b = bMap[date] && bMap[date][t];
