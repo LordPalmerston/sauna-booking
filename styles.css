@@ -206,6 +206,11 @@ header { display: flex; justify-content: space-between; align-items: center; mar
 .cal-slot.booked-other { background: var(--slot-booked-other); color: var(--bg-color); cursor: not-allowed; }
 .cal-slot.maintenance { background: var(--slot-maintenance); color: var(--bg-color); cursor: not-allowed; }
 .cal-slot.past-slot { opacity: 0.6; cursor: not-allowed; }
+.cal-slot.past-slot:not(.booked-me):not(.booked-other):not(.maintenance) {
+    background-color: #EFEBE9;
+    color: #8D7A70;
+    background-image: repeating-linear-gradient(45deg, var(--bg-color), var(--bg-color) 10px, #EFEBE9 10px, #EFEBE9 20px);
+}
 .cal-slot .slot-label { font-size: 0.75rem; margin-top: 2px; }
 
 /* Modal */
