@@ -74,6 +74,7 @@
                     <span id="user-display-name" style="font-weight:600;"></span>
                     <button id="btn-edit-name" class="icon-btn" style="border:none; background:transparent; padding:0; cursor:pointer;" title="Edit Screenname">✏️</button>
                     <span id="membership-badge" class="badge"></span>
+                    <span id="door-code-badge" class="badge none" style="margin-left: 10px;">Door Code: <span id="door-code-value">Hidden</span></span>
                     <span style="font-size: 0.6rem; color: #4CAF50; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-left: 5px;">● Live</span>
                     <button id="btn-admin-panel" class="hidden outline-btn">Admin</button>
                     <button id="btn-logout" class="outline-btn" style="border-color:var(--danger-color); color:var(--danger-color);">Logout</button>
@@ -113,6 +114,15 @@
             </header>
             
             <div class="admin-controls" style="background:var(--surface-color); padding: 20px; border-radius: var(--border-radius); display: flex; flex-direction: column; gap: 20px;">
+                <div class="admin-table-container">
+                    <h3 style="color:var(--primary-color);">Door Access Control</h3>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="text" id="admin-door-code-input" placeholder="Loading current code..." style="padding: 10px; border-radius: var(--border-radius); border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); flex: 1;">
+                        <button id="btn-update-door-code" class="primary-btn">Update Code</button>
+                    </div>
+                    <p id="admin-door-code-msg" class="error-msg" style="color: var(--primary-color); display:none;"></p>
+                </div>
+
                 <div style="display: flex; gap: 10px;">
                     <button id="btn-export-csv" class="primary-btn" style="flex:1;">Export All Bookings to CSV</button>
                     <button id="btn-export-users-csv" class="primary-btn" style="flex:1; background: var(--secondary-color);">Export User Registry to CSV</button>
@@ -131,6 +141,22 @@
                         <div id="stat-restricted-accounts" style="font-size: 1.5rem; font-weight: 700; color: var(--danger-color);">0</div>
                         <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Restricted</div>
                     </div>
+                </div>
+
+                <div class="admin-table-container">
+                    <h3 style="color:var(--primary-color);">Pending Approvals</h3>
+                    <table id="pending-approvals-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Requested Plan</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pending-management-rows">
+                            <!-- Rows dynamically populated -->
+                        </tbody>
+                    </table>
                 </div>
 
                 <div class="admin-table-container">
@@ -184,6 +210,58 @@
                 <!-- Buttons injected securely via JS -->
             </div>
             <p id="modal-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <div id="plan-selection-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3>Choose a Membership Plan</h3>
+            <p style="color:var(--text-muted); font-size: 0.9rem; margin-top: 5px;">You need an active plan to book the sauna.</p>
+            
+            <div class="plan-options" style="margin: 20px 0; display: flex; flex-direction: column; gap: 10px;">
+                <label class="plan-card">
+                    <input type="radio" name="plan_choice" value="annual_new">
+                    <div class="plan-details">
+                        <strong>New Membership (Annual)</strong>
+                        <span>1500 kr (1000 kr entrance + 500 kr/yr)</span>
+                    </div>
+                </label>
+                <label class="plan-card">
+                    <input type="radio" name="plan_choice" value="annual_renew">
+                    <div class="plan-details">
+                        <strong>Annual Renewal</strong>
+                        <span>500 kr / year</span>
+                    </div>
+                </label>
+                <label class="plan-card">
+                    <input type="radio" name="plan_choice" value="monthly">
+                    <div class="plan-details">
+                        <strong>Temporary (Monthly)</strong>
+                        <span>500 kr / 30 days</span>
+                    </div>
+                </label>
+                <label class="plan-card">
+                    <input type="radio" name="plan_choice" value="weekly">
+                    <div class="plan-details">
+                        <strong>Temporary (Weekly)</strong>
+                        <span>300 kr / 7 days</span>
+                    </div>
+                </label>
+            </div>
+
+            <div id="payment-instructions" style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; display: none;">
+                <p><strong>Payment Instructions:</strong></p>
+                <p>1. Pay the amount via Swish to <strong>Karin Huber (072-563 60 89)</strong></p>
+                <p>2. Take a screenshot of the payment receipt.</p>
+                <p>3. Email the screenshot to <a href="mailto:saunatranholmen@gmail.com" style="color:var(--primary-color);">saunatranholmen@gmail.com</a></p>
+                <p style="margin-top:10px; color:var(--text-muted);">After clicking "I Have Paid", an admin will review your request. Your time will not start ticking until your first booked session.</p>
+            </div>
+
+            <div class="modal-actions" style="margin-top:20px; display:flex;">
+                <button id="btn-submit-plan" class="primary-btn" disabled>I Have Paid</button>
+                <button id="btn-cancel-plan" class="outline-btn" style="margin-left: 10px;">Cancel</button>
+            </div>
+            <p id="plan-modal-error" class="error-msg"></p>
         </div>
     </div>
 

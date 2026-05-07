@@ -58,6 +58,15 @@ const modalErr = document.getElementById('modal-error');
 const endTimeContainer = document.getElementById('end-time-container');
 const endTimeSelect = document.getElementById('modal-end-time');
 const membershipBadge = document.getElementById('membership-badge');
+const planModal = document.getElementById('plan-selection-modal');
+
+let currentDoorCode = "";
+let unsubscribeDoorCode = null;
+const doorCodeBadge = document.getElementById('door-code-badge');
+const doorCodeValue = document.getElementById('door-code-value');
+const adminDoorCodeInput = document.getElementById('admin-door-code-input');
+const btnUpdateDoorCode = document.getElementById('btn-update-door-code');
+const adminDoorCodeMsg = document.getElementById('admin-door-code-msg');
 
 function formatEuroDate(date) {
     if (!date) return "";
@@ -100,7 +109,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
             screenname: scren, 
             email: email, 
             role: role,
-            membership: { expiresAt: null, isRemoved: false }
+            membership: { expiresAt: null, isRemoved: false, status: 'none', plan: null, pendingPlan: null }
         });
         errEl.textContent = "";
     } catch (err) { errEl.textContent = err.message; }
@@ -144,13 +153,55 @@ function updateMembershipUI(membership) {
     if (!membershipBadge) return;
     membershipBadge.className = 'badge';
     
-    // Membership enforcement is currently paused
     if (membership && membership.isRemoved) {
         membershipBadge.textContent = "Access Restricted";
         membershipBadge.classList.add('expired');
-    } else {
-        membershipBadge.textContent = "Unlimited Access";
+    } else if (membership && membership.status === 'pending_payment') {
+        membershipBadge.textContent = "Pending Approval";
+        membershipBadge.classList.add('expired');
+    } else if (membership && membership.status === 'approved_pending_start') {
+        membershipBadge.textContent = "Ready to Start";
         membershipBadge.classList.add('active');
+    } else if (membership && membership.expiresAt) {
+        const exp = membership.expiresAt.toDate ? membership.expiresAt.toDate() : new Date(membership.expiresAt);
+        if (exp < new Date()) {
+            membershipBadge.textContent = "Expired";
+            membershipBadge.classList.add('expired');
+        } else {
+            membershipBadge.textContent = `Active until ${formatEuroDate(exp)}`;
+            membershipBadge.classList.add('active');
+        }
+    } else {
+        membershipBadge.textContent = "No Active Plan";
+        membershipBadge.classList.add('none');
+    }
+    
+    updateDoorCodeUI();
+}
+
+function updateDoorCodeUI() {
+    if (!doorCodeBadge || !doorCodeValue) return;
+    
+    let hasAccess = false;
+    if (currentRole === 'admin') {
+        hasAccess = true;
+    } else if (currentMembership) {
+        if (currentMembership.status === 'active' || currentMembership.status === 'approved_pending_start') {
+            if (currentMembership.expiresAt) {
+                const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+                if (exp > new Date()) hasAccess = true;
+            } else if (currentMembership.status === 'approved_pending_start') {
+                hasAccess = true;
+            }
+        }
+    }
+    
+    if (hasAccess && currentDoorCode) {
+        doorCodeValue.textContent = currentDoorCode;
+        doorCodeBadge.className = 'badge active';
+    } else {
+        doorCodeValue.textContent = "Hidden";
+        doorCodeBadge.className = 'badge none';
     }
 }
 
@@ -164,7 +215,7 @@ onAuthStateChanged(auth, async (user) => {
             if (uDoc.exists()) {
                 const data = uDoc.data();
                 currentRole = data.role;
-                currentMembership = data.membership || { expiresAt: null, isRemoved: false };
+                currentMembership = data.membership || { expiresAt: null, isRemoved: false, status: 'none' };
                 
                 if (currentMembership.isRemoved && currentRole !== 'admin') {
                     alert("Your account has been removed. Please contact the administrator.");
@@ -179,11 +230,46 @@ onAuthStateChanged(auth, async (user) => {
         switchView('main');
         initCalendar();
         listenToMyBookings();
+        listenToDoorCode();
     } else {
         if (unsubscribeBookings) unsubscribeBookings();
         if (unsubscribeMyBookings) unsubscribeMyBookings();
-        currentUser = null; currentRole = 'user'; currentMembership = null;
+        if (unsubscribeDoorCode) unsubscribeDoorCode();
+        currentUser = null; currentRole = 'user'; currentMembership = null; currentDoorCode = "";
         switchView('auth');
+    }
+});
+
+// === PLAN MODAL LOGIC ===
+document.querySelectorAll('input[name="plan_choice"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        document.getElementById('payment-instructions').style.display = 'block';
+        document.getElementById('btn-submit-plan').disabled = false;
+    });
+});
+
+document.getElementById('btn-cancel-plan').addEventListener('click', () => {
+    planModal.classList.remove('active');
+});
+
+document.getElementById('btn-submit-plan').addEventListener('click', async () => {
+    const selectedPlan = document.querySelector('input[name="plan_choice"]:checked').value;
+    const errEl = document.getElementById('plan-modal-error');
+    errEl.textContent = "Submitting request...";
+    
+    try {
+        await updateDoc(doc(db, "users", currentUser.uid), {
+            "membership.status": "pending_payment",
+            "membership.pendingPlan": selectedPlan
+        });
+        currentMembership.status = "pending_payment";
+        currentMembership.pendingPlan = selectedPlan;
+        updateMembershipUI(currentMembership);
+        
+        planModal.classList.remove('active');
+        alert("Your request has been sent! Please ensure you've emailed the screenshot to saunatranholmen@gmail.com.");
+    } catch (e) {
+        errEl.textContent = e.message;
     }
 });
 
@@ -239,6 +325,19 @@ function initCalendar() {
 }
 
 // === DATABASE SYNC ===
+function listenToDoorCode() {
+    if (unsubscribeDoorCode) unsubscribeDoorCode();
+    unsubscribeDoorCode = onSnapshot(doc(db, "settings", "door"), (docSnap) => {
+        if (docSnap.exists()) {
+            currentDoorCode = docSnap.data().currentCode || "";
+        } else {
+            currentDoorCode = "";
+        }
+        if (adminDoorCodeInput) adminDoorCodeInput.value = currentDoorCode;
+        updateDoorCodeUI();
+    });
+}
+
 function listenToMyBookings() {
     if (unsubscribeMyBookings) unsubscribeMyBookings();
     const q = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
@@ -446,7 +545,7 @@ window.handleSlotClick = function(el) {
     }
 }
 
-// Membership Enforcement (Expiration bypassed - only check if Removed)
+// Membership Enforcement
 if (currentRole !== 'admin' && !existingBooking) {
     if (currentMembership && currentMembership.isRemoved) {
         modalTitle.textContent = "Access Restricted";
@@ -456,6 +555,31 @@ if (currentRole !== 'admin' && !existingBooking) {
         document.querySelector('.modal-actions').innerHTML = `<button id="btn-close-membership" class="primary-btn">Close</button>`;
         document.getElementById('btn-close-membership').addEventListener('click', () => modal.classList.remove('active'));
         modal.classList.add('active');
+        return;
+    }
+    
+    let isExpired = true;
+    if (currentMembership) {
+        if (currentMembership.status === 'approved_pending_start' || currentMembership.status === 'active') {
+            if (currentMembership.expiresAt) {
+                const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+                if (exp > new Date()) isExpired = false;
+            } else if (currentMembership.status === 'approved_pending_start') {
+                isExpired = false;
+            }
+        }
+    }
+    
+    if (isExpired) {
+        if (currentMembership && currentMembership.status === 'pending_payment') {
+            alert("Your payment is currently pending approval by an admin. You will be able to book once it is approved.");
+        } else {
+            planModal.classList.add('active');
+            document.querySelectorAll('input[name="plan_choice"]').forEach(r => r.checked = false);
+            document.getElementById('payment-instructions').style.display = 'none';
+            document.getElementById('btn-submit-plan').disabled = true;
+            document.getElementById('plan-modal-error').textContent = "";
+        }
         return;
     }
 }
@@ -581,6 +705,28 @@ async function executeBookingAction() {
     } else {
         // Create new bookings via Promise.all
         try {
+            // First check if they are starting a new membership plan
+            if (currentRole !== 'admin' && currentMembership && currentMembership.status === 'approved_pending_start') {
+                const [y, mm, dNum] = targetSlot.date.split('-').map(Number);
+                let expDate = new Date(y, mm - 1, dNum);
+                
+                if (currentMembership.plan.startsWith('annual')) {
+                    expDate = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
+                } else if (currentMembership.plan === 'monthly') {
+                    expDate.setDate(expDate.getDate() + 30);
+                } else if (currentMembership.plan === 'weekly') {
+                    expDate.setDate(expDate.getDate() + 7);
+                }
+                
+                await updateDoc(doc(db, "users", currentUser.uid), {
+                    "membership.status": "active",
+                    "membership.expiresAt": expDate
+                });
+                currentMembership.status = "active";
+                currentMembership.expiresAt = expDate;
+                updateMembershipUI(currentMembership);
+            }
+
             const timesToBook = JSON.parse(endTimeSelect.value);
             
             const promises = timesToBook.map(timeSlot => {
@@ -706,30 +852,64 @@ async function renderUpcomingBookings() {
 
 async function renderAdminUsers() {
     const tbody = document.getElementById('user-management-rows');
-    tbody.innerHTML = "<tr><td colspan='3'>Loading users...</td></tr>";
+    const ptbody = document.getElementById('pending-management-rows');
+    if(tbody) tbody.innerHTML = "<tr><td colspan='3'>Loading users...</td></tr>";
+    if(ptbody) ptbody.innerHTML = "<tr><td colspan='3'>Loading pending requests...</td></tr>";
     try {
         const snap = await getDocs(collection(db, "users"));
         
         let totalUsers = 0;
         let activeMembers = 0;
         let restrictedUsers = 0;
+        let pendingUsers = [];
         const now = new Date();
 
         // Sort: Role first (Admins then Users), then Screenname alphabetically
         const sortedUsers = snap.docs.map(docSnap => {
             const u = docSnap.data();
             const uid = docSnap.id;
-            const m = u.membership || { expiresAt: null, isRemoved: false };
+            const m = u.membership || { expiresAt: null, isRemoved: false, status: 'none' };
             
             totalUsers++;
             if (m.isRemoved) restrictedUsers++;
-            else if (m.expiresAt && m.expiresAt.toDate() > now) activeMembers++;
+            else if (m.status === 'active' && m.expiresAt && m.expiresAt.toDate() > now) activeMembers++;
+            else if (m.status === 'approved_pending_start') activeMembers++;
+            
+            if (m.status === 'pending_payment') {
+                pendingUsers.push({ uid, ...u });
+            }
 
             return { uid, ...u };
         }).sort((a,b) => {
             if (a.role !== b.role) return a.role.localeCompare(b.role);
             return (a.screenname || '').localeCompare(b.screenname || '');
         });
+
+        if(ptbody) {
+            ptbody.innerHTML = "";
+            if (pendingUsers.length === 0) {
+                ptbody.innerHTML = "<tr><td colspan='3'>No pending approvals.</td></tr>";
+            } else {
+                pendingUsers.forEach(u => {
+                    const m = u.membership;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>
+                            <strong>${u.screenname}</strong><br>
+                            <span class="user-email">${u.email}</span>
+                        </td>
+                        <td><strong>${m.pendingPlan}</strong></td>
+                        <td>
+                            <div class="mgt-btn-group">
+                                <button class="mgt-btn primary" data-action="approve_plan" data-id="${u.uid}">Approve</button>
+                                <button class="mgt-btn danger" data-action="reject_plan" data-id="${u.uid}">Reject</button>
+                            </div>
+                        </td>
+                    `;
+                    ptbody.appendChild(tr);
+                });
+            }
+        }
 
         // Update stats UI
         document.getElementById('stat-total-users').textContent = totalUsers;
@@ -758,7 +938,7 @@ async function renderAdminUsers() {
             const tr = document.createElement('tr');
             if (m.isRemoved) tr.className = 'row-removed';
             
-            const expiryStr = m.expiresAt ? formatEuroDate(m.expiresAt) : "No Membership";
+            const expiryStr = m.expiresAt ? formatEuroDate(m.expiresAt) : (m.status === 'approved_pending_start' ? 'Pending First Booking' : 'No Membership');
             
             tr.innerHTML = `
                 <td>
@@ -811,7 +991,14 @@ async function handleAdminAction(e) {
         const uData = uDoc.data();
         let m = uData.membership || { expiresAt: null, isRemoved: false };
         
-        if (action === 'remove') {
+        if (action === 'approve_plan') {
+            m.status = 'approved_pending_start';
+            m.plan = m.pendingPlan;
+            m.pendingPlan = null;
+        } else if (action === 'reject_plan') {
+            m.status = 'none';
+            m.pendingPlan = null;
+        } else if (action === 'remove') {
             m.isRemoved = true;
         } else if (action === 'restore') {
             m.isRemoved = false;
@@ -868,3 +1055,22 @@ document.getElementById('btn-export-users-csv').addEventListener('click', async 
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } catch (e) { alert("Failed to export: " + e.message); }
 });
+
+if (btnUpdateDoorCode) {
+    btnUpdateDoorCode.addEventListener('click', async () => {
+        const newCode = adminDoorCodeInput.value.trim();
+        adminDoorCodeMsg.style.display = 'block';
+        adminDoorCodeMsg.textContent = "Updating...";
+        adminDoorCodeMsg.style.color = "var(--text-main)";
+        
+        try {
+            await setDoc(doc(db, "settings", "door"), { currentCode: newCode }, { merge: true });
+            adminDoorCodeMsg.textContent = "Code updated successfully!";
+            adminDoorCodeMsg.style.color = "var(--success-color)";
+            setTimeout(() => { adminDoorCodeMsg.style.display = 'none'; }, 3000);
+        } catch(e) {
+            adminDoorCodeMsg.textContent = e.message;
+            adminDoorCodeMsg.style.color = "var(--danger-color)";
+        }
+    });
+}

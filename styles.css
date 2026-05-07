@@ -221,6 +221,16 @@ header { display: flex; justify-content: space-between; align-items: center; mar
 .modal-actions button { flex: 1 1 auto; min-width: 100px; }
 .error-msg { color: var(--danger-color); font-size: 0.85rem; margin-top: 5px; }
 
+/* Plan Selection */
+.plan-options { display: flex; flex-direction: column; gap: 10px; }
+.plan-card { display: flex; align-items: center; gap: 15px; padding: 15px; border: 1px solid var(--border-color); border-radius: var(--border-radius); cursor: pointer; transition: var(--transition); background: var(--surface-color); }
+.plan-card:hover { border-color: var(--primary-color); background: var(--surface-hover); }
+.plan-card input[type="radio"] { transform: scale(1.2); accent-color: var(--primary-color); }
+.plan-details { display: flex; flex-direction: column; gap: 4px; }
+.plan-details strong { color: var(--text-main); font-size: 1rem; }
+.plan-details span { color: var(--text-muted); font-size: 0.85rem; }
+.plan-card:has(input:checked) { border-color: var(--primary-color); background: var(--bg-color); box-shadow: 0 0 0 1px var(--primary-color); }
+
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 600px) {
     header { flex-direction: column; gap: 15px; align-items: flex-start; }
