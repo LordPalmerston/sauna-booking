@@ -186,13 +186,11 @@ function updateDoorCodeUI() {
     if (currentRole === 'admin') {
         hasAccess = true;
     } else if (currentMembership) {
-        if (currentMembership.status === 'active' || currentMembership.status === 'approved_pending_start') {
-            if (currentMembership.expiresAt) {
-                const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
-                if (exp > new Date()) hasAccess = true;
-            } else if (currentMembership.status === 'approved_pending_start') {
-                hasAccess = true;
-            }
+        if (currentMembership.status === 'approved_pending_start') {
+            hasAccess = true;
+        } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
+            const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+            if (exp > new Date()) hasAccess = true;
         }
     }
     
@@ -560,13 +558,11 @@ if (currentRole !== 'admin' && !existingBooking) {
     
     let isExpired = true;
     if (currentMembership) {
-        if (currentMembership.status === 'approved_pending_start' || currentMembership.status === 'active') {
-            if (currentMembership.expiresAt) {
-                const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
-                if (exp > new Date()) isExpired = false;
-            } else if (currentMembership.status === 'approved_pending_start') {
-                isExpired = false;
-            }
+        if (currentMembership.status === 'approved_pending_start') {
+            isExpired = false;
+        } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
+            const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+            if (exp > new Date()) isExpired = false;
         }
     }
     
@@ -938,7 +934,12 @@ async function renderAdminUsers() {
             const tr = document.createElement('tr');
             if (m.isRemoved) tr.className = 'row-removed';
             
-            const expiryStr = m.expiresAt ? formatEuroDate(m.expiresAt) : (m.status === 'approved_pending_start' ? 'Pending First Booking' : 'No Membership');
+            let expiryStr = "No Membership";
+            if (m.status === 'approved_pending_start') {
+                expiryStr = "Pending First Booking";
+            } else if (m.expiresAt) {
+                expiryStr = formatEuroDate(m.expiresAt);
+            }
             
             tr.innerHTML = `
                 <td>
