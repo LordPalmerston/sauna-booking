@@ -959,6 +959,8 @@ async function renderAdminUsers() {
                             <button class="mgt-btn" data-action="sub" data-unit="year" data-id="${uid}">-1y</button>
                             <button class="mgt-btn primary" data-action="add" data-unit="month" data-id="${uid}">+1m</button>
                             <button class="mgt-btn" data-action="sub" data-unit="month" data-id="${uid}">-1m</button>
+                            <button class="mgt-btn primary" data-action="add" data-unit="week" data-id="${uid}">+1w</button>
+                            <button class="mgt-btn" data-action="sub" data-unit="week" data-id="${uid}">-1w</button>
                         </div>
                         ${m.isRemoved ? 
                             `<button class="mgt-btn undo" style="width:100%; background:#5D4037; color:white; border:none; padding:8px;" data-action="restore" data-id="${uid}">Undo Remove (Restore Access)</button>` : 
@@ -1010,6 +1012,7 @@ async function handleAdminAction(e) {
             const amount = action === 'add' ? 1 : -1;
             if (unit === 'year') currentExpiry.setFullYear(currentExpiry.getFullYear() + amount);
             else if (unit === 'month') currentExpiry.setMonth(currentExpiry.getMonth() + amount);
+            else if (unit === 'week') currentExpiry.setDate(currentExpiry.getDate() + (7 * amount));
             
             m.expiresAt = currentExpiry;
         }
