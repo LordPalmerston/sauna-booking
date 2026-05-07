@@ -60,6 +60,9 @@ const endTimeSelect = document.getElementById('modal-end-time');
 const membershipBadge = document.getElementById('membership-badge');
 const planModal = document.getElementById('plan-selection-modal');
 
+// === FEATURE TOGGLES ===
+const MEMBERSHIP_ENFORCEMENT_ENABLED = false; // Set to false to allow everyone to book and see the door code (except restricted users)
+
 let currentDoorCode = "";
 let unsubscribeDoorCode = null;
 const doorCodeBadge = document.getElementById('door-code-badge');
@@ -153,6 +156,18 @@ function updateMembershipUI(membership) {
     if (!membershipBadge) return;
     membershipBadge.className = 'badge';
     
+    if (!MEMBERSHIP_ENFORCEMENT_ENABLED) {
+        if (membership && membership.isRemoved) {
+            membershipBadge.textContent = "Access Restricted";
+            membershipBadge.classList.add('expired');
+        } else {
+            membershipBadge.textContent = "Unlimited Access";
+            membershipBadge.classList.add('active');
+        }
+        updateDoorCodeUI();
+        return;
+    }
+    
     if (membership && membership.isRemoved) {
         membershipBadge.textContent = "Access Restricted";
         membershipBadge.classList.add('expired');
@@ -183,14 +198,20 @@ function updateDoorCodeUI() {
     if (!doorCodeBadge || !doorCodeValue) return;
     
     let hasAccess = false;
-    if (currentRole === 'admin') {
-        hasAccess = true;
-    } else if (currentMembership) {
-        if (currentMembership.status === 'approved_pending_start') {
+    if (!MEMBERSHIP_ENFORCEMENT_ENABLED) {
+        if (currentRole === 'admin' || (currentMembership && !currentMembership.isRemoved)) {
             hasAccess = true;
-        } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
-            const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
-            if (exp > new Date()) hasAccess = true;
+        }
+    } else {
+        if (currentRole === 'admin') {
+            hasAccess = true;
+        } else if (currentMembership) {
+            if (currentMembership.status === 'approved_pending_start') {
+                hasAccess = true;
+            } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
+                const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+                if (exp > new Date()) hasAccess = true;
+            }
         }
     }
     
@@ -557,7 +578,9 @@ if (currentRole !== 'admin' && !existingBooking) {
     }
     
     let isExpired = true;
-    if (currentMembership) {
+    if (!MEMBERSHIP_ENFORCEMENT_ENABLED) {
+        isExpired = false;
+    } else if (currentMembership) {
         if (currentMembership.status === 'approved_pending_start') {
             isExpired = false;
         } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
@@ -702,7 +725,7 @@ async function executeBookingAction() {
         // Create new bookings via Promise.all
         try {
             // First check if they are starting a new membership plan
-            if (currentRole !== 'admin' && currentMembership && currentMembership.status === 'approved_pending_start') {
+            if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin' && currentMembership && currentMembership.status === 'approved_pending_start') {
                 const [y, mm, dNum] = targetSlot.date.split('-').map(Number);
                 let expDate = new Date(y, mm - 1, dNum);
                 
