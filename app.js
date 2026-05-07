@@ -1015,7 +1015,15 @@ async function handleAdminAction(e) {
             else if (unit === 'month') currentExpiry.setMonth(currentExpiry.getMonth() + amount);
             else if (unit === 'week') currentExpiry.setDate(currentExpiry.getDate() + (7 * amount));
             
-            m.expiresAt = currentExpiry;
+            if (currentExpiry < new Date() && action === 'sub') {
+                m.status = 'none';
+                m.expiresAt = null;
+                m.plan = null;
+                m.pendingPlan = null;
+            } else {
+                m.status = 'active';
+                m.expiresAt = currentExpiry;
+            }
         }
         
         await updateDoc(uRef, { membership: m });
