@@ -730,7 +730,7 @@ async function executeBookingAction() {
                 let expDate = new Date(y, mm - 1, dNum);
                 
                 if (currentMembership.plan.startsWith('annual')) {
-                    expDate = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
+                    expDate.setFullYear(expDate.getFullYear() + 1);
                 } else if (currentMembership.plan === 'monthly') {
                     expDate.setDate(expDate.getDate() + 30);
                 } else if (currentMembership.plan === 'weekly') {
