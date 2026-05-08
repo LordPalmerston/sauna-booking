@@ -727,14 +727,15 @@ async function executeBookingAction() {
             // First check if they are starting a new membership plan
             if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin' && currentMembership && currentMembership.status === 'approved_pending_start') {
                 const [y, mm, dNum] = targetSlot.date.split('-').map(Number);
-                let expDate = new Date(y, mm - 1, dNum);
+                let expDate = new Date(y, mm - 1, dNum, 23, 59, 59);
                 
                 if (currentMembership.plan.startsWith('annual')) {
                     expDate.setFullYear(expDate.getFullYear() + 1);
+                    expDate.setDate(expDate.getDate() - 1);
                 } else if (currentMembership.plan === 'monthly') {
-                    expDate.setDate(expDate.getDate() + 30);
+                    expDate.setDate(expDate.getDate() + 30 - 1);
                 } else if (currentMembership.plan === 'weekly') {
-                    expDate.setDate(expDate.getDate() + 7);
+                    expDate.setDate(expDate.getDate() + 7 - 1);
                 }
                 
                 await updateDoc(doc(db, "users", currentUser.uid), {
