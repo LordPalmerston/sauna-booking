@@ -835,7 +835,7 @@ async function renderBookingStats() {
                 // Tally user counts
                 if (b.userId && b.screenname) {
                     if (!userCountsThisYear[b.userId]) {
-                        userCountsThisYear[b.userId] = { count: 0, screenname: b.screenname };
+                        userCountsThisYear[b.userId] = { count: 0, screenname: b.screenname, email: b.email || "" };
                     }
                     userCountsThisYear[b.userId].count++;
                 }
@@ -865,7 +865,7 @@ async function renderBookingStats() {
 
         const usersList = document.getElementById('stat-top-users');
         usersList.innerHTML = topUsers.length > 0 
-            ? topUsers.map((u, i) => `<li style="padding: 5px 0; border-bottom: 1px solid var(--border-color);"><strong>${i+1}.</strong> ${u.screenname} <span style="color:var(--text-muted);">(${u.count} slots)</span></li>`).join('')
+            ? topUsers.map((u, i) => `<li style="padding: 5px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;"><div><strong>${i+1}.</strong> ${u.screenname} <br><span style="font-size:0.7rem; color:var(--text-muted);">${u.email}</span></div> <span style="color:var(--text-muted); font-size: 0.8rem;">${u.count} slots</span></li>`).join('')
             : '<li>No bookings this year</li>';
 
         const timesList = document.getElementById('stat-popular-times');
