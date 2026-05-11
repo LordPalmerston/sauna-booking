@@ -800,8 +800,83 @@ btns.admin.addEventListener('click', () => {
     switchView('admin');
     renderAdminUsers();
     renderUpcomingBookings();
+    renderBookingStats();
 });
 btns.backCal.addEventListener('click', () => switchView('main'));
+
+async function renderBookingStats() {
+    try {
+        const snap = await getDocs(query(collection(db, "bookings")));
+        const allBookings = snap.docs.map(d => d.data());
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-12
+
+        let bookingsThisMonth = 0;
+        let bookingsThisYear = 0;
+        const allTimeBookings = allBookings.length;
+
+        const userCountsThisYear = {};
+        const timeCountsThisYear = {};
+
+        allBookings.forEach(b => {
+            if (b.status === 'maintenance') return;
+
+            const [y, m, d] = b.date.split('-').map(Number);
+
+            if (y === currentYear) {
+                bookingsThisYear++;
+                
+                if (m === currentMonth) {
+                    bookingsThisMonth++;
+                }
+
+                // Tally user counts
+                if (b.userId && b.screenname) {
+                    if (!userCountsThisYear[b.userId]) {
+                        userCountsThisYear[b.userId] = { count: 0, screenname: b.screenname };
+                    }
+                    userCountsThisYear[b.userId].count++;
+                }
+
+                // Tally popular times
+                if (b.time) {
+                    timeCountsThisYear[b.time] = (timeCountsThisYear[b.time] || 0) + 1;
+                }
+            }
+        });
+
+        // Sort Top Users
+        const topUsers = Object.values(userCountsThisYear)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        // Sort Popular Times
+        const popularTimes = Object.entries(timeCountsThisYear)
+            .map(([time, count]) => ({ time, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        // Update UI
+        document.getElementById('stat-bookings-month').textContent = bookingsThisMonth;
+        document.getElementById('stat-bookings-year').textContent = bookingsThisYear;
+        document.getElementById('stat-bookings-alltime').textContent = allTimeBookings;
+
+        const usersList = document.getElementById('stat-top-users');
+        usersList.innerHTML = topUsers.length > 0 
+            ? topUsers.map((u, i) => `<li style="padding: 5px 0; border-bottom: 1px solid var(--border-color);"><strong>${i+1}.</strong> ${u.screenname} <span style="color:var(--text-muted);">(${u.count} slots)</span></li>`).join('')
+            : '<li>No bookings this year</li>';
+
+        const timesList = document.getElementById('stat-popular-times');
+        timesList.innerHTML = popularTimes.length > 0
+            ? popularTimes.map((t, i) => `<li style="padding: 5px 0; border-bottom: 1px solid var(--border-color);"><strong>${i+1}.</strong> ${t.time} <span style="color:var(--text-muted);">(${t.count} bookings)</span></li>`).join('')
+            : '<li>No bookings this year</li>';
+
+    } catch (e) {
+        console.error("Failed to load booking stats:", e);
+    }
+}
 
 async function renderUpcomingBookings() {
     const tbody = document.getElementById('upcoming-management-rows');

@@ -145,6 +145,38 @@
                 </div>
 
                 <div class="admin-table-container">
+                    <h3 style="color:var(--primary-color);">Booking Statistics</h3>
+                    <div id="booking-stats-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center; margin-bottom: 20px;">
+                        <div class="stat-card" style="background:#f8f9fa; padding: 15px; border-radius: 8px;">
+                            <div id="stat-bookings-month" style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Bookings This Month</div>
+                        </div>
+                        <div class="stat-card" style="background:#f8f9fa; padding: 15px; border-radius: 8px;">
+                            <div id="stat-bookings-year" style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Bookings This Year</div>
+                        </div>
+                        <div class="stat-card" style="background:#f8f9fa; padding: 15px; border-radius: 8px;">
+                            <div id="stat-bookings-alltime" style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">All-Time Bookings</div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h4>Top 5 Users (Current Year)</h4>
+                            <ul id="stat-top-users" style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem;">
+                                <!-- Dynamically populated -->
+                            </ul>
+                        </div>
+                        <div>
+                            <h4>Popular Times (Current Year)</h4>
+                            <ul id="stat-popular-times" style="list-style: none; padding: 0; margin: 0; font-size: 0.9rem;">
+                                <!-- Dynamically populated -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-table-container">
                     <h3 style="color:var(--primary-color);">Pending Approvals</h3>
                     <table id="pending-approvals-table">
                         <thead>
