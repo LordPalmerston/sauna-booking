@@ -817,10 +817,17 @@ async function renderBookingStats() {
         let bookingsThisYear = 0;
         const allTimeBookings = allBookings.length;
 
+        // Sort all bookings first to correctly identify session starts
+        const sortedBookings = allBookings.sort((a,b) => {
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
+            return a.time.localeCompare(b.time);
+        });
+
         const userCountsThisYear = {};
         const timeCountsThisYear = {};
+        const lastSessionEnd = {}; // Tracking per user per date: { "userId_date": "HH:MM" }
 
-        allBookings.forEach(b => {
+        sortedBookings.forEach(b => {
             if (b.status === 'maintenance') return;
 
             const [y, m, d] = b.date.split('-').map(Number);
@@ -832,7 +839,7 @@ async function renderBookingStats() {
                     bookingsThisMonth++;
                 }
 
-                // Tally user counts
+                // Tally user hours
                 if (b.userId && b.screenname) {
                     if (!userCountsThisYear[b.userId]) {
                         userCountsThisYear[b.userId] = { count: 0, screenname: b.screenname, email: b.email || "" };
@@ -840,10 +847,17 @@ async function renderBookingStats() {
                     userCountsThisYear[b.userId].count++;
                 }
 
-                // Tally popular times
-                if (b.time) {
-                    timeCountsThisYear[b.time] = (timeCountsThisYear[b.time] || 0) + 1;
+                // Tally popular STARTING times
+                const sessionKey = `${b.userId}_${b.date}`;
+                if (lastSessionEnd[sessionKey] !== b.time) {
+                    // This slot doesn't immediately follow the previous one for this user -> it's a START
+                    if (b.time) {
+                        timeCountsThisYear[b.time] = (timeCountsThisYear[b.time] || 0) + 1;
+                    }
                 }
+                // Update the "next expected slot" for this user's current session
+                const slotIndex = allTimes.indexOf(b.time);
+                lastSessionEnd[sessionKey] = allTimes[slotIndex + 1] || "24:00";
             }
         });
 
