@@ -283,10 +283,10 @@ onAuthStateChanged(auth, async (user) => {
                         const yearlyInput = document.querySelector('input[value="annual_renew"]');
                         if (hasPaidFull) {
                             yearlyInput.disabled = false;
-                            document.getElementById('plan-card-annual-renew').style.opacity = '1';
+                            document.getElementById('plan-card-annual-renew').style.display = 'flex';
                         } else {
                             yearlyInput.disabled = true;
-                            document.getElementById('plan-card-annual-renew').style.opacity = '0.5';
+                            document.getElementById('plan-card-annual-renew').style.display = 'none';
                         }
                         
                         // Reset selection
