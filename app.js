@@ -1220,6 +1220,11 @@ async function renderAdminUsers() {
             }
         }
 
+        // Update stats UI
+        document.getElementById('stat-total-users').textContent = totalUsers;
+        document.getElementById('stat-active-members').textContent = activeMembers;
+        document.getElementById('stat-restricted-accounts').textContent = restrictedUsers;
+
         tbody.innerHTML = "";
 
         groups.forEach(group => {
