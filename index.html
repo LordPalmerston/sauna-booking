@@ -147,7 +147,7 @@
                     </div>
                 </div>
 
-                <div class="admin-table-container">
+                <div class="admin-table-container" id="admin-booking-stats-container">
                     <h3 style="color:var(--primary-color);">Booking Statistics</h3>
                     <div id="booking-stats-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center; margin-bottom: 20px;">
                         <div class="stat-card" style="background:#f8f9fa; padding: 15px; border-radius: 8px;">
@@ -218,7 +218,7 @@
                             <tr>
                                 <th>User</th>
                                 <th>Membership Expiry</th>
-                                <th>Actions</th>
+                                <th id="admin-user-actions-th">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="user-management-rows">
@@ -308,6 +308,6 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=1.10"></script>
+    <script type="module" src="app.js?v=1.11"></script>
 </body>
 </html>

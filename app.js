@@ -219,11 +219,11 @@ function updateDoorCodeUI() {
     
     let hasAccess = false;
     if (!MEMBERSHIP_ENFORCEMENT_ENABLED) {
-        if (currentRole === 'admin' || (currentMembership && !currentMembership.isRemoved)) {
+        if (['admin', 'moderator'].includes(currentRole) || (currentMembership && !currentMembership.isRemoved)) {
             hasAccess = true;
         }
     } else {
-        if (currentRole === 'admin') {
+        if (['admin', 'moderator'].includes(currentRole)) {
             hasAccess = true;
         } else if (currentMembership) {
             if (currentMembership.status === 'approved_pending_start') {
@@ -249,6 +249,7 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
         document.getElementById('user-display-name').textContent = `Hello, ${user.displayName || user.email}`;
+        btns.admin.classList.toggle('hidden', !['admin', 'moderator'].includes(currentRole));
         try {
             const uDoc = await getDoc(doc(db, "users", user.uid));
             if (uDoc.exists()) {
@@ -256,14 +257,14 @@ onAuthStateChanged(auth, async (user) => {
                 currentRole = data.role;
                 currentMembership = data.membership || { expiresAt: null, isRemoved: false, status: 'none' };
                 
-                if (currentMembership.isRemoved && currentRole !== 'admin') {
+                if (currentMembership.isRemoved && !['admin', 'moderator'].includes(currentRole)) {
                     alert("Your account has been removed. Please contact the administrator.");
                     signOut(auth);
                     return;
                 }
                 updateMembershipUI(currentMembership);
 
-                if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin') {
+                if (MEMBERSHIP_ENFORCEMENT_ENABLED && !['admin', 'moderator'].includes(currentRole)) {
                     let hasAccess = false;
                     if (currentMembership.status === 'approved_pending_start') hasAccess = true;
                     if (currentMembership.status === 'pending_payment') hasAccess = true;
@@ -306,7 +307,7 @@ onAuthStateChanged(auth, async (user) => {
             }
         } catch(e) { console.error(e); }
         
-        btns.admin.classList.toggle('hidden', currentRole !== 'admin');
+        btns.admin.classList.toggle('hidden', !['admin', 'moderator'].includes(currentRole));
         switchView('main');
         initCalendar();
         listenToMyBookings();
@@ -539,7 +540,7 @@ function updateCalendarUI() {
 
             if (isPast) {
                 el.innerHTML = "Passed";
-                if (currentRole !== 'admin') {
+                if (!['admin', 'moderator'].includes(currentRole)) {
                     el.classList.add('past-slot');
                 }
             }
@@ -551,7 +552,7 @@ function updateCalendarUI() {
                     el.innerHTML = "Maintenance";
                 } else if (b.userId === currentUser.uid) {
                     el.classList.add('booked-me');
-                    if (isPast && currentRole !== 'admin') {
+                    if (isPast && !['admin', 'moderator'].includes(currentRole)) {
                         el.innerHTML = `Booked by Me`;
                     } else {
                         el.innerHTML = `Booked by Me<div class="slot-label">(Click to delete)</div>`;
@@ -559,7 +560,7 @@ function updateCalendarUI() {
                 } else {
                     el.classList.add('booked-other');
                     let txt = b.screenname;
-                    if (currentRole === 'admin') txt += `<br><span style="font-size:0.6rem">${b.email}</span>`;
+                    if (['admin', 'moderator'].includes(currentRole)) txt += `<br><span style="font-size:0.6rem">${b.email}</span>`;
                     el.innerHTML = `Booked<br><span class="slot-label">${txt}</span>`;
                 }
 
@@ -588,9 +589,9 @@ window.handleSlotClick = function(el) {
     const slotDateTime = new Date(y, m - 1, dNum, hrs, mins);
     const isPast = slotDateTime < now;
 
-    if (isPast && currentRole !== 'admin') return;
+    if (isPast && !['admin', 'moderator'].includes(currentRole)) return;
     
-    if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin' && currentMembership && currentMembership.status === 'pending_payment') {
+    if (MEMBERSHIP_ENFORCEMENT_ENABLED && !['admin', 'moderator'].includes(currentRole) && currentMembership && currentMembership.status === 'pending_payment') {
         alert("Your payment is currently pending approval. You cannot book or modify slots until an admin approves it.");
         return;
     }
@@ -610,7 +611,7 @@ window.handleSlotClick = function(el) {
             const [checkHrs, checkMins] = checkTime.split(':').map(Number);
             const checkDateTime = new Date(y, m - 1, dNum, checkHrs, checkMins);
             
-            if (checkDateTime < now && currentRole !== 'admin') {
+            if (checkDateTime < now && !['admin', 'moderator'].includes(currentRole)) {
                 break;
             }
 
@@ -631,7 +632,7 @@ window.handleSlotClick = function(el) {
 }
 
 // Membership Enforcement
-if (currentRole !== 'admin' && !existingBooking) {
+if (!['admin', 'moderator'].includes(currentRole) && !existingBooking) {
     if (currentMembership && currentMembership.isRemoved) {
         modalTitle.textContent = "Access Restricted";
         modalTime.textContent = "Your account access has been restricted.";
@@ -670,10 +671,15 @@ if (currentRole !== 'admin' && !existingBooking) {
 }
 
 // Reject foreign click normally
-if (existingBooking && existingBooking.userId !== currentUser.uid && currentRole !== 'admin' && existingBooking.status !== 'maintenance') {
+const modalActions = document.querySelector('.modal-actions');
+modalActions.innerHTML = "";
+
+if (existingBooking && existingBooking.userId !== currentUser.uid && !['admin', 'moderator'].includes(currentRole) && existingBooking.status !== 'maintenance') {
+        modalErr.textContent = "Booked by another user.";
         return; 
     }
-    if (existingBooking && existingBooking.status === 'maintenance' && currentRole !== 'admin') {
+    if (existingBooking && existingBooking.status === 'maintenance' && !['admin', 'moderator'].includes(currentRole)) {
+        modalErr.textContent = "Under maintenance.";
         return;
     }
 
@@ -687,7 +693,7 @@ if (existingBooking && existingBooking.userId !== currentUser.uid && currentRole
         endTimeContainer.style.display = "none";
         modalTitle.textContent = "Manage Booking";
         primaryAction = existingBooking.status === 'maintenance' ? "Remove Maintenance" : "Delete Booking";
-        if (currentRole === 'admin' && existingBooking.status !== 'maintenance') {
+        if (['admin', 'moderator'].includes(currentRole) && existingBooking.status !== 'maintenance') {
             extraBtnHTML = `<button id="btn-admin-maint" class="outline-btn" style="color:var(--danger-color)">Convert to Maintenance</button>`;
         }
     } else {
@@ -695,7 +701,7 @@ if (existingBooking && existingBooking.userId !== currentUser.uid && currentRole
         modalTitle.textContent = "Book Sauna Slot";
         endTimeContainer.style.display = "block";
         
-        if (currentRole === 'admin') {
+        if (['admin', 'moderator'].includes(currentRole)) {
             extraBtnHTML = `<button id="btn-admin-maint" class="outline-btn" style="color:var(--danger-color)">Set Maintenance</button>`;
         }
 
@@ -710,7 +716,7 @@ if (existingBooking && existingBooking.userId !== currentUser.uid && currentRole
         const dayOfWeek = dObj.getDay(); 
 
         // Apply Fri/Sat 1.5h (3 slots) limits 
-        if (currentRole !== 'admin' && (dayOfWeek === 5 || dayOfWeek === 6)) {
+        if (!['admin', 'moderator'].includes(currentRole) && (dayOfWeek === 5 || dayOfWeek === 6)) {
             const weekendBookings = currentBookings.filter(b => {
                 const [by, bm, bd_num] = b.date.split('-').map(Number);
                 const dayObj = new Date(by, bm - 1, bd_num);
@@ -787,7 +793,7 @@ async function executeBookingAction() {
             await Promise.all(promises);
             
             // Unbook reset logic
-            if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin' && currentMembership && currentMembership.status === 'active') {
+            if (MEMBERSHIP_ENFORCEMENT_ENABLED && !['admin', 'moderator'].includes(currentRole) && currentMembership && currentMembership.status === 'active') {
                 const now = new Date();
                 const userQuery = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
                 const userSnap = await getDocs(userQuery);
@@ -876,7 +882,7 @@ async function executeBookingAction() {
         // Create new bookings via Promise.all
         try {
             // First check if they are starting a new membership plan
-            if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin' && currentMembership && currentMembership.status === 'approved_pending_start') {
+            if (MEMBERSHIP_ENFORCEMENT_ENABLED && !['admin', 'moderator'].includes(currentRole) && currentMembership && currentMembership.status === 'approved_pending_start') {
                 const [y, mm, dNum] = targetSlot.date.split('-').map(Number);
                 let activeDate = new Date(y, mm - 1, dNum, 0, 0, 0);
                 let expDate = new Date(activeDate);
@@ -1130,6 +1136,7 @@ async function renderAdminUsers() {
 
         // Categorize Users
         const adminUsers = [];
+        const moderatorUsers = [];
         const yearlyUsers = [];
         const monthlyUsers = [];
         const weeklyUsers = [];
@@ -1159,6 +1166,8 @@ async function renderAdminUsers() {
 
             if (u.role === 'admin') {
                 adminUsers.push(userObj);
+            } else if (u.role === 'moderator') {
+                moderatorUsers.push(userObj);
             } else if (m.isRemoved) {
                 restrictedUsersList.push(userObj);
             } else if (m.status === 'none' || m.status === 'pending_payment') {
@@ -1179,6 +1188,7 @@ async function renderAdminUsers() {
 
         const sorter = (a, b) => (a.screenname || '').localeCompare(b.screenname || '');
         adminUsers.sort(sorter);
+        moderatorUsers.sort(sorter);
         yearlyUsers.sort(sorter);
         monthlyUsers.sort(sorter);
         weeklyUsers.sort(sorter);
@@ -1187,12 +1197,27 @@ async function renderAdminUsers() {
 
         const groups = [
             { title: "Admins", data: adminUsers },
+            { title: "Moderators", data: moderatorUsers },
             { title: "Yearly Memberships", data: yearlyUsers },
             { title: "Monthly Memberships", data: monthlyUsers },
             { title: "Weekly Memberships", data: weeklyUsers },
             { title: "No Membership", data: noMembershipUsers },
             { title: "Restricted Accounts", data: restrictedUsersList }
         ];
+
+        // Apply Moderator UI restrictions
+        const adminStatsContainer = document.getElementById('admin-booking-stats-container');
+        if (adminStatsContainer) adminStatsContainer.style.display = currentRole === 'moderator' ? 'none' : 'block';
+
+        const btnExportCsv = document.getElementById('btn-export-csv');
+        if (btnExportCsv && btnExportCsv.parentElement) {
+            btnExportCsv.parentElement.style.display = currentRole === 'moderator' ? 'none' : 'flex';
+        }
+
+        const actionsTh = document.getElementById('admin-user-actions-th');
+        if (actionsTh) {
+            actionsTh.style.display = currentRole === 'moderator' ? 'none' : '';
+        }
 
         if(ptbody) {
             ptbody.innerHTML = "";
@@ -1252,6 +1277,23 @@ async function renderAdminUsers() {
                     expiryStr = formatEuroDate(m.expiresAt);
                 }
                 
+                let actionsHTML = '';
+                if (currentRole === 'admin') {
+                    const isMod = u.role === 'moderator';
+                    const modBtnHTML = isMod 
+                        ? `<button class="mgt-btn primary" data-action="remove_mod" data-id="${uid}" style="font-size:0.7rem; padding: 4px;">Demote Mod</button>`
+                        : (u.role !== 'admin' ? `<button class="mgt-btn primary" data-action="make_mod" data-id="${uid}" style="font-size:0.7rem; padding: 4px;">Appoint Mod</button>` : '');
+                        
+                    actionsHTML = `
+                        <td style="white-space:nowrap;">
+                            <div class="mgt-btn-group" style="gap:5px;">
+                                <button class="mgt-btn danger" data-action="revoke_plan" data-id="${uid}" style="font-size:0.7rem; padding: 4px;">Revoke Plan</button>
+                                ${modBtnHTML}
+                            </div>
+                        </td>
+                    `;
+                }
+
                 tr.innerHTML = `
                     <td>
                         <div class="user-info">
@@ -1264,17 +1306,7 @@ async function renderAdminUsers() {
                         </div>
                     </td>
                     <td>${expiryStr}</td>
-                    <td>
-                        <div class="mgt-btn-group" style="flex-wrap: wrap;">
-                            ${(m.status === 'active' || m.status === 'approved_pending_start') ? 
-                                `<button class="mgt-btn outline-btn" style="width:100%; border-color:var(--danger-color); color:var(--danger-color); padding:8px; margin-bottom:5px;" data-action="revoke_plan" data-id="${uid}">Revoke Plan</button>` : ''
-                            }
-                            ${m.isRemoved ? 
-                                `<button class="mgt-btn undo" style="width:100%; background:#5D4037; color:white; border:none; padding:8px;" data-action="restore" data-id="${uid}">Undo Remove (Restore Access)</button>` : 
-                                `<button class="mgt-btn danger" style="width:100%; background:var(--danger-color); color:white; border:none; padding:8px;" data-action="remove" data-id="${uid}">Block User</button>`
-                            }
-                        </div>
-                    </td>
+                    ${actionsHTML}
                 `;
                 tbody.appendChild(tr);
             });
@@ -1305,16 +1337,26 @@ async function handleAdminAction(e) {
         const uData = uDoc.data();
         let m = uData.membership || { expiresAt: null, isRemoved: false };
         let hasPaid = uData.hasPaidFullMembership || false;
+        let uRole = uData.role || 'user';
         
-        if (action === 'approve_plan') {
+        if (action === 'make_mod') {
+            if (currentRole !== 'admin') { btn.disabled = false; return; }
+            uRole = 'moderator';
+        } else if (action === 'remove_mod') {
+            if (currentRole !== 'admin') { btn.disabled = false; return; }
+            uRole = 'user';
+        } else if (action === 'approve_plan') {
+            if (!['admin', 'moderator'].includes(currentRole)) { btn.disabled = false; return; }
             m.status = 'approved_pending_start';
             m.plan = m.pendingPlan;
             if (m.plan === 'full' || m.plan === 'full_yearly') hasPaid = true;
             m.pendingPlan = null;
         } else if (action === 'reject_plan') {
+            if (!['admin', 'moderator'].includes(currentRole)) { btn.disabled = false; return; }
             m.status = 'none';
             m.pendingPlan = null;
         } else if (action === 'revoke_plan') {
+            if (currentRole !== 'admin') { btn.disabled = false; return; }
             if (!confirm("Are you sure you want to completely revoke this user's membership plan? They will immediately lose access and have to purchase a new plan.")) {
                 btn.disabled = false;
                 return;
@@ -1325,12 +1367,14 @@ async function handleAdminAction(e) {
             m.activatedAt = null;
             m.pendingPlan = null;
         } else if (action === 'remove') {
+            if (currentRole !== 'admin') { btn.disabled = false; return; }
             m.isRemoved = true;
         } else if (action === 'restore') {
+            if (currentRole !== 'admin') { btn.disabled = false; return; }
             m.isRemoved = false;
         }
         
-        await updateDoc(uRef, { membership: m, hasPaidFullMembership: hasPaid });
+        await updateDoc(uRef, { membership: m, hasPaidFullMembership: hasPaid, role: uRole });
         renderAdminUsers(); // Refresh list
     } catch (err) {
         alert("Action failed: " + err.message);
