@@ -779,6 +779,74 @@ async function executeBookingAction() {
         try {
             const promises = targetBlockIds.map(id => deleteDoc(doc(db, "bookings", id)));
             await Promise.all(promises);
+            
+            // Unbook reset logic
+            if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin' && currentMembership && currentMembership.status === 'active') {
+                const now = new Date();
+                const userQuery = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
+                const userSnap = await getDocs(userQuery);
+                let remainingBookings = userSnap.docs.map(d => d.data());
+                
+                const actDate = currentMembership.activatedAt 
+                    ? (currentMembership.activatedAt.toDate ? currentMembership.activatedAt.toDate() : new Date(currentMembership.activatedAt)) 
+                    : new Date(0); 
+                
+                let hasUsedSaunaOnThisPlan = false;
+                let earliestFutureBooking = null;
+
+                remainingBookings.forEach(b => {
+                    const [y, mNum, dNum] = b.date.split('-').map(Number);
+                    const [hrs, mins] = b.time.split(':').map(Number);
+                    const bDate = new Date(y, mNum - 1, dNum, hrs, mins);
+                    
+                    if (bDate >= actDate) {
+                        if (bDate < now) {
+                            hasUsedSaunaOnThisPlan = true;
+                        } else {
+                            if (!earliestFutureBooking || bDate < earliestFutureBooking) {
+                                earliestFutureBooking = bDate;
+                            }
+                        }
+                    }
+                });
+
+                if (!hasUsedSaunaOnThisPlan) {
+                    if (earliestFutureBooking) {
+                        // Shift activation to this new future booking
+                        let newActDate = new Date(earliestFutureBooking.getFullYear(), earliestFutureBooking.getMonth(), earliestFutureBooking.getDate(), 0, 0, 0);
+                        let expDate = new Date(newActDate);
+                        expDate.setHours(23, 59, 59, 999);
+                        
+                        if (currentMembership.plan && currentMembership.plan.startsWith('annual')) {
+                            expDate.setFullYear(expDate.getFullYear() + 1);
+                            expDate.setDate(expDate.getDate() - 1);
+                        } else if (currentMembership.plan === 'monthly') {
+                            expDate.setDate(expDate.getDate() + 30 - 1);
+                        } else if (currentMembership.plan === 'weekly') {
+                            expDate.setDate(expDate.getDate() + 7 - 1);
+                        }
+                        
+                        await updateDoc(doc(db, "users", currentUser.uid), {
+                            "membership.activatedAt": newActDate,
+                            "membership.expiresAt": expDate
+                        });
+                        currentMembership.activatedAt = newActDate;
+                        currentMembership.expiresAt = expDate;
+                    } else {
+                        // Completely revert to approved_pending_start
+                        await updateDoc(doc(db, "users", currentUser.uid), {
+                            "membership.status": "approved_pending_start",
+                            "membership.activatedAt": null,
+                            "membership.expiresAt": null
+                        });
+                        currentMembership.status = "approved_pending_start";
+                        currentMembership.activatedAt = null;
+                        currentMembership.expiresAt = null;
+                    }
+                    updateMembershipUI(currentMembership);
+                }
+            }
+            
             modal.classList.remove('active');
         } catch(e) { modalErr.textContent = "Error: " + e.message; }
     } else {
@@ -787,9 +855,11 @@ async function executeBookingAction() {
             // First check if they are starting a new membership plan
             if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin' && currentMembership && currentMembership.status === 'approved_pending_start') {
                 const [y, mm, dNum] = targetSlot.date.split('-').map(Number);
-                let expDate = new Date(y, mm - 1, dNum, 23, 59, 59);
+                let activeDate = new Date(y, mm - 1, dNum, 0, 0, 0);
+                let expDate = new Date(activeDate);
+                expDate.setHours(23, 59, 59, 999);
                 
-                if (currentMembership.plan.startsWith('annual')) {
+                if (currentMembership.plan && currentMembership.plan.startsWith('annual')) {
                     expDate.setFullYear(expDate.getFullYear() + 1);
                     expDate.setDate(expDate.getDate() - 1);
                 } else if (currentMembership.plan === 'monthly') {
@@ -800,10 +870,12 @@ async function executeBookingAction() {
                 
                 await updateDoc(doc(db, "users", currentUser.uid), {
                     "membership.status": "active",
-                    "membership.expiresAt": expDate
+                    "membership.expiresAt": expDate,
+                    "membership.activatedAt": activeDate
                 });
                 currentMembership.status = "active";
                 currentMembership.expiresAt = expDate;
+                currentMembership.activatedAt = activeDate;
                 updateMembershipUI(currentMembership);
             }
 
