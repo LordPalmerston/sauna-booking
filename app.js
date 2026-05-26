@@ -785,11 +785,28 @@ async function executeBookingAction() {
                 const now = new Date();
                 const userQuery = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
                 const userSnap = await getDocs(userQuery);
-                let remainingBookings = userSnap.docs.map(d => d.data());
+                let remainingBookings = userSnap.docs
+                    .map(d => ({ id: d.id, ...d.data() }))
+                    .filter(b => !targetBlockIds.includes(b.id));
                 
-                const actDate = currentMembership.activatedAt 
-                    ? (currentMembership.activatedAt.toDate ? currentMembership.activatedAt.toDate() : new Date(currentMembership.activatedAt)) 
-                    : new Date(0); 
+                let actDate;
+                if (currentMembership.activatedAt) {
+                    actDate = currentMembership.activatedAt.toDate ? currentMembership.activatedAt.toDate() : new Date(currentMembership.activatedAt);
+                } else if (currentMembership.expiresAt && currentMembership.plan) {
+                    let exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+                    actDate = new Date(exp);
+                    if (currentMembership.plan.startsWith('annual')) {
+                        actDate.setFullYear(actDate.getFullYear() - 1);
+                        actDate.setDate(actDate.getDate() + 1);
+                    } else if (currentMembership.plan === 'monthly') {
+                        actDate.setDate(actDate.getDate() - 30 + 1);
+                    } else if (currentMembership.plan === 'weekly') {
+                        actDate.setDate(actDate.getDate() - 7 + 1);
+                    }
+                    actDate.setHours(0,0,0,0);
+                } else {
+                    actDate = new Date(0);
+                }
                 
                 let hasUsedSaunaOnThisPlan = false;
                 let earliestFutureBooking = null;
