@@ -1122,8 +1122,15 @@ async function renderAdminUsers() {
         let pendingUsers = [];
         const now = new Date();
 
-        // Sort: Role first (Admins then Users), then Screenname alphabetically
-        const sortedUsers = snap.docs.map(docSnap => {
+        // Categorize Users
+        const adminUsers = [];
+        const yearlyUsers = [];
+        const monthlyUsers = [];
+        const weeklyUsers = [];
+        const noMembershipUsers = [];
+        const restrictedUsersList = [];
+
+        snap.docs.forEach(docSnap => {
             const u = docSnap.data();
             const uid = docSnap.id;
             const m = u.membership || { expiresAt: null, isRemoved: false, status: 'none' };
@@ -1137,102 +1144,98 @@ async function renderAdminUsers() {
                 pendingUsers.push({ uid, ...u });
             }
 
-            return { uid, ...u };
-        }).sort((a,b) => {
-            if (a.role !== b.role) return a.role.localeCompare(b.role);
-            return (a.screenname || '').localeCompare(b.screenname || '');
+            const userObj = { uid, ...u, membership: m };
+
+            if (u.role === 'admin') {
+                adminUsers.push(userObj);
+            } else if (m.isRemoved) {
+                restrictedUsersList.push(userObj);
+            } else if (m.status === 'none' || m.status === 'pending_payment') {
+                noMembershipUsers.push(userObj);
+            } else {
+                const p = m.plan || '';
+                if (p.includes('annual') || p.includes('full') || p === 'yearly') {
+                    yearlyUsers.push(userObj);
+                } else if (p === 'monthly') {
+                    monthlyUsers.push(userObj);
+                } else if (p === 'weekly') {
+                    weeklyUsers.push(userObj);
+                } else {
+                    noMembershipUsers.push(userObj);
+                }
+            }
         });
 
-        if(ptbody) {
-            ptbody.innerHTML = "";
-            if (pendingUsers.length === 0) {
-                ptbody.innerHTML = "<tr><td colspan='3'>No pending approvals.</td></tr>";
-            } else {
-                pendingUsers.forEach(u => {
-                    const m = u.membership;
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>
-                            <strong>${u.screenname}</strong><br>
-                            <span class="user-email">${u.email}</span>
-                        </td>
-                        <td><strong>${m.pendingPlan}</strong></td>
-                        <td>
-                            <div class="mgt-btn-group">
-                                <button class="mgt-btn primary" data-action="approve_plan" data-id="${u.uid}">Approve</button>
-                                <button class="mgt-btn danger" data-action="reject_plan" data-id="${u.uid}">Reject</button>
-                            </div>
-                        </td>
-                    `;
-                    ptbody.appendChild(tr);
-                });
-            }
-        }
+        const sorter = (a, b) => (a.screenname || '').localeCompare(b.screenname || '');
+        adminUsers.sort(sorter);
+        yearlyUsers.sort(sorter);
+        monthlyUsers.sort(sorter);
+        weeklyUsers.sort(sorter);
+        noMembershipUsers.sort(sorter);
+        restrictedUsersList.sort(sorter);
 
-        // Update stats UI
-        document.getElementById('stat-total-users').textContent = totalUsers;
-        document.getElementById('stat-active-members').textContent = activeMembers;
-        document.getElementById('stat-restricted-accounts').textContent = restrictedUsers;
+        const groups = [
+            { title: "Admins", data: adminUsers },
+            { title: "Yearly Memberships", data: yearlyUsers },
+            { title: "Monthly Memberships", data: monthlyUsers },
+            { title: "Weekly Memberships", data: weeklyUsers },
+            { title: "No Membership", data: noMembershipUsers },
+            { title: "Restricted Accounts", data: restrictedUsersList }
+        ];
 
         tbody.innerHTML = "";
-        let currentGroup = null;
 
-        sortedUsers.forEach(u => {
-            const uid = u.uid;
-            const m = u.membership || { expiresAt: null, isRemoved: false };
-            
-            // Add a group header if role changes
-            if (u.role !== currentGroup) {
-                currentGroup = u.role;
-                const separator = document.createElement('tr');
-                separator.innerHTML = `
-                    <td colspan="3" style="background:rgba(0,0,0,0.02); font-weight:700; color:var(--text-muted); font-size:0.7rem; text-transform:uppercase; border-bottom: 2px solid var(--border-color); padding: 15px 12px 5px 12px;">
-                        ${u.role}s
-                    </td>
-                `;
-                tbody.appendChild(separator);
-            }
+        groups.forEach(group => {
+            if (group.data.length === 0) return;
 
-            const tr = document.createElement('tr');
-            if (m.isRemoved) tr.className = 'row-removed';
-            
-            let expiryStr = "No Membership";
-            if (m.status === 'approved_pending_start') {
-                expiryStr = "Pending First Booking";
-            } else if (m.expiresAt) {
-                expiryStr = formatEuroDate(m.expiresAt);
-            }
-            
-            tr.innerHTML = `
-                <td>
-                    <div class="user-info">
-                        <div style="display:flex; align-items:center; gap:5px;">
-                            <strong>${u.screenname}</strong>
-                            ${m.isRemoved ? `<span style="font-size:0.6rem; background:var(--danger-color); color:white; padding:2px 6px; border-radius:4px;">RESTRICTED</span>` : ''}
-                        </div>
-                        <span class="user-email">${u.email}</span>
-                        <span style="font-size:0.6rem; color:var(--primary-color)">${u.role.toUpperCase()}</span>
-                    </div>
-                </td>
-                <td>${expiryStr}</td>
-                <td>
-                    <div class="mgt-btn-group" style="flex-wrap: wrap;">
-                        <div style="display:flex; gap:5px; width:100%; margin-bottom:5px;">
-                            <button class="mgt-btn primary" data-action="add" data-unit="year" data-id="${uid}">+1y</button>
-                            <button class="mgt-btn" data-action="sub" data-unit="year" data-id="${uid}">-1y</button>
-                            <button class="mgt-btn primary" data-action="add" data-unit="month" data-id="${uid}">+1m</button>
-                            <button class="mgt-btn" data-action="sub" data-unit="month" data-id="${uid}">-1m</button>
-                            <button class="mgt-btn primary" data-action="add" data-unit="week" data-id="${uid}">+1w</button>
-                            <button class="mgt-btn" data-action="sub" data-unit="week" data-id="${uid}">-1w</button>
-                        </div>
-                        ${m.isRemoved ? 
-                            `<button class="mgt-btn undo" style="width:100%; background:#5D4037; color:white; border:none; padding:8px;" data-action="restore" data-id="${uid}">Undo Remove (Restore Access)</button>` : 
-                            `<button class="mgt-btn danger" style="width:100%; background:var(--danger-color); color:white; border:none; padding:8px;" data-action="remove" data-id="${uid}">Remove User (Block Access)</button>`
-                        }
-                    </div>
+            const separator = document.createElement('tr');
+            separator.innerHTML = `
+                <td colspan="3" style="background:rgba(0,0,0,0.04); font-weight:700; color:var(--text-color); font-size:0.8rem; text-transform:uppercase; border-bottom: 2px solid var(--border-color); padding: 15px 12px 5px 12px;">
+                    ${group.title} (${group.data.length})
                 </td>
             `;
-            tbody.appendChild(tr);
+            tbody.appendChild(separator);
+
+            group.data.forEach(u => {
+                const uid = u.uid;
+                const m = u.membership;
+                
+                const tr = document.createElement('tr');
+                if (m.isRemoved) tr.className = 'row-removed';
+                
+                let expiryStr = "No Membership";
+                if (m.status === 'approved_pending_start') {
+                    expiryStr = "Pending First Booking";
+                } else if (m.expiresAt) {
+                    expiryStr = formatEuroDate(m.expiresAt);
+                }
+                
+                tr.innerHTML = `
+                    <td>
+                        <div class="user-info">
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <strong>${u.screenname}</strong>
+                                ${m.isRemoved ? `<span style="font-size:0.6rem; background:var(--danger-color); color:white; padding:2px 6px; border-radius:4px;">RESTRICTED</span>` : ''}
+                            </div>
+                            <span class="user-email">${u.email}</span>
+                            <span style="font-size:0.6rem; color:var(--primary-color)">${u.role.toUpperCase()}</span>
+                        </div>
+                    </td>
+                    <td>${expiryStr}</td>
+                    <td>
+                        <div class="mgt-btn-group" style="flex-wrap: wrap;">
+                            ${(m.status === 'active' || m.status === 'approved_pending_start') ? 
+                                `<button class="mgt-btn outline-btn" style="width:100%; border-color:var(--danger-color); color:var(--danger-color); padding:8px; margin-bottom:5px;" data-action="revoke_plan" data-id="${uid}">Revoke Plan</button>` : ''
+                            }
+                            ${m.isRemoved ? 
+                                `<button class="mgt-btn undo" style="width:100%; background:#5D4037; color:white; border:none; padding:8px;" data-action="restore" data-id="${uid}">Undo Remove (Restore Access)</button>` : 
+                                `<button class="mgt-btn danger" style="width:100%; background:var(--danger-color); color:white; border:none; padding:8px;" data-action="remove" data-id="${uid}">Block User</button>`
+                            }
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         });
 
         // Add event listeners to all buttons
@@ -1265,29 +1268,20 @@ async function handleAdminAction(e) {
         } else if (action === 'reject_plan') {
             m.status = 'none';
             m.pendingPlan = null;
+        } else if (action === 'revoke_plan') {
+            if (!confirm("Are you sure you want to completely revoke this user's membership plan? They will immediately lose access and have to purchase a new plan.")) {
+                btn.disabled = false;
+                return;
+            }
+            m.status = 'none';
+            m.plan = null;
+            m.expiresAt = null;
+            m.activatedAt = null;
+            m.pendingPlan = null;
         } else if (action === 'remove') {
             m.isRemoved = true;
         } else if (action === 'restore') {
             m.isRemoved = false;
-        } else if (action === 'add' || action === 'sub') {
-            let currentExpiry = m.expiresAt ? (m.expiresAt.toDate ? m.expiresAt.toDate() : new Date(m.expiresAt)) : new Date();
-            // If expired, start from now
-            if (currentExpiry < new Date()) currentExpiry = new Date();
-            
-            const amount = action === 'add' ? 1 : -1;
-            if (unit === 'year') currentExpiry.setFullYear(currentExpiry.getFullYear() + amount);
-            else if (unit === 'month') currentExpiry.setMonth(currentExpiry.getMonth() + amount);
-            else if (unit === 'week') currentExpiry.setDate(currentExpiry.getDate() + (7 * amount));
-            
-            if (currentExpiry < new Date() && action === 'sub') {
-                m.status = 'none';
-                m.expiresAt = null;
-                m.plan = null;
-                m.pendingPlan = null;
-            } else {
-                m.status = 'active';
-                m.expiresAt = currentExpiry;
-            }
         }
         
         await updateDoc(uRef, { membership: m, hasPaidFullMembership: hasPaid });
