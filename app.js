@@ -1136,9 +1136,14 @@ async function renderAdminUsers() {
             const m = u.membership || { expiresAt: null, isRemoved: false, status: 'none' };
             
             totalUsers++;
-            if (m.isRemoved) restrictedUsers++;
-            else if (m.status === 'active' && m.expiresAt && m.expiresAt.toDate() > now) activeMembers++;
-            else if (m.status === 'approved_pending_start') activeMembers++;
+            if (m.isRemoved) {
+                restrictedUsers++;
+            } else if (m.status === 'active' && m.expiresAt) {
+                const exp = m.expiresAt.toDate ? m.expiresAt.toDate() : new Date(m.expiresAt);
+                if (exp > now) activeMembers++;
+            } else if (m.status === 'approved_pending_start') {
+                activeMembers++;
+            }
             
             if (m.status === 'pending_payment') {
                 pendingUsers.push({ uid, ...u });
@@ -1243,7 +1248,11 @@ async function renderAdminUsers() {
             btn.addEventListener('click', handleAdminAction);
         });
 
-    } catch (e) { tbody.innerHTML = `<tr><td colspan='3'>Error: ${e.message}</td></tr>`; }
+    } catch (e) {
+        console.error(e);
+        if(tbody) tbody.innerHTML = `<tr><td colspan='3'>Error: ${e.message}</td></tr>`;
+        if(ptbody) ptbody.innerHTML = `<tr><td colspan='3'>Error: ${e.message}</td></tr>`;
+    }
 }
 
 async function handleAdminAction(e) {
