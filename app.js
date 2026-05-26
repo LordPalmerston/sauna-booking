@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // === FIREBASE CONFIGURATION ===
@@ -127,6 +127,25 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         errEl.textContent = "";
     }
     catch (err) { errEl.textContent = "Invalid credentials."; }
+});
+
+document.getElementById('btn-forgot-password').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const emailInput = document.getElementById('login-email').value;
+    const errEl = document.getElementById('login-error');
+    if (!emailInput) {
+        errEl.textContent = "Please enter your email address first.";
+        return;
+    }
+    errEl.textContent = "Sending reset email...";
+    try {
+        await sendPasswordResetEmail(auth, emailInput);
+        errEl.textContent = "Password reset email sent! Check your inbox.";
+        errEl.style.color = "var(--success-color)";
+    } catch (err) {
+        errEl.textContent = "Failed to send reset email: " + err.message;
+        errEl.style.color = "var(--danger-color)";
+    }
 });
 
 btns.logout.addEventListener('click', () => signOut(auth));
