@@ -221,6 +221,13 @@ header { display: flex; justify-content: space-between; align-items: center; mar
 .modal-actions button { flex: 1 1 auto; min-width: 100px; }
 .error-msg { color: var(--danger-color); font-size: 0.85rem; margin-top: 5px; }
 
+.blur-background {
+    filter: blur(5px);
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.6;
+}
+
 /* Plan Selection */
 .plan-options { display: flex; flex-direction: column; gap: 10px; }
 .plan-card { display: flex; align-items: center; gap: 15px; padding: 15px; border: 1px solid var(--border-color); border-radius: var(--border-radius); cursor: pointer; transition: var(--transition); background: var(--surface-color); }

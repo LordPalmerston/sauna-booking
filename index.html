@@ -254,42 +254,49 @@
             <h3>Choose a Membership Plan</h3>
             <p style="color:var(--text-muted); font-size: 0.9rem; margin-top: 5px;">You need an active plan to book the sauna.</p>
             
-            <div class="plan-options" style="margin: 20px 0; display: flex; flex-direction: column; gap: 10px;">
-                <label class="plan-card">
-                    <input type="radio" name="plan_choice" value="annual_new">
+            <div class="plan-options" id="plan-options-container" style="margin: 20px 0; display: flex; flex-direction: column; gap: 10px;">
+                <label class="plan-card" id="plan-card-full">
+                    <input type="radio" name="plan_choice" value="full">
                     <div class="plan-details">
-                        <strong>New Membership (Annual)</strong>
-                        <span>1500 kr (1000 kr entrance + 500 kr/yr)</span>
+                        <strong>Full Membership (Entrance Fee)</strong>
+                        <span>1000 SEK (One-time fee)</span>
                     </div>
                 </label>
-                <label class="plan-card">
+                <label class="plan-card" id="plan-card-full-yearly">
+                    <input type="radio" name="plan_choice" value="full_yearly">
+                    <div class="plan-details">
+                        <strong>Full Membership + Yearly Access</strong>
+                        <span>1500 SEK</span>
+                    </div>
+                </label>
+                <label class="plan-card" id="plan-card-annual-renew">
                     <input type="radio" name="plan_choice" value="annual_renew">
                     <div class="plan-details">
-                        <strong>Annual Renewal</strong>
-                        <span>500 kr / year</span>
+                        <strong>Yearly Renewal</strong>
+                        <span>500 SEK</span>
                     </div>
                 </label>
-                <label class="plan-card">
+                <label class="plan-card" id="plan-card-monthly">
                     <input type="radio" name="plan_choice" value="monthly">
                     <div class="plan-details">
-                        <strong>Temporary (Monthly)</strong>
-                        <span>500 kr / 30 days</span>
+                        <strong>Monthly Access</strong>
+                        <span>400 SEK / 30 days</span>
                     </div>
                 </label>
-                <label class="plan-card">
+                <label class="plan-card" id="plan-card-weekly">
                     <input type="radio" name="plan_choice" value="weekly">
                     <div class="plan-details">
-                        <strong>Temporary (Weekly)</strong>
-                        <span>300 kr / 7 days</span>
+                        <strong>Weekly Access</strong>
+                        <span>300 SEK / 7 days</span>
                     </div>
                 </label>
             </div>
 
             <div id="payment-instructions" style="background: var(--bg-color); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; display: none;">
                 <p><strong>Payment Instructions:</strong></p>
-                <p>1. Pay the amount via Swish to <strong>Karin Huber (072-563 60 89)</strong></p>
+                <p>1. Pay the selected amount via Swish to <strong>Karin Huber (072-563 60 89)</strong>.</p>
                 <p>2. Take a screenshot of the payment receipt.</p>
-                <p>3. Email the screenshot to <a href="mailto:saunatranholmen@gmail.com" style="color:var(--primary-color);">saunatranholmen@gmail.com</a></p>
+                <p>3. Email the screenshot to <a href="mailto:saunatranholmen@gmail.com" style="color:var(--primary-color);">saunatranholmen@gmail.com</a>.</p>
                 <p style="margin-top:10px; color:var(--text-muted);">After clicking "I Have Paid", an admin will review your request. Your time will not start ticking until your first booked session.</p>
             </div>
 
@@ -301,6 +308,6 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=1.2"></script>
+    <script type="module" src="app.js?v=1.3"></script>
 </body>
 </html>

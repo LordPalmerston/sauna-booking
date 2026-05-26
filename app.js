@@ -61,7 +61,7 @@ const membershipBadge = document.getElementById('membership-badge');
 const planModal = document.getElementById('plan-selection-modal');
 
 // === FEATURE TOGGLES ===
-const MEMBERSHIP_ENFORCEMENT_ENABLED = false; // Set to false to allow everyone to book and see the door code (except restricted users)
+const MEMBERSHIP_ENFORCEMENT_ENABLED = true; // Set to false to allow everyone to book and see the door code (except restricted users)
 
 let currentDoorCode = "";
 let unsubscribeDoorCode = null;
@@ -112,6 +112,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
             screenname: scren, 
             email: email, 
             role: role,
+            hasPaidFullMembership: false,
             membership: { expiresAt: null, isRemoved: false, status: 'none', plan: null, pendingPlan: null }
         });
         errEl.textContent = "";
@@ -261,6 +262,46 @@ onAuthStateChanged(auth, async (user) => {
                     return;
                 }
                 updateMembershipUI(currentMembership);
+
+                if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin') {
+                    let hasAccess = false;
+                    if (currentMembership.status === 'approved_pending_start') hasAccess = true;
+                    if (currentMembership.status === 'active' && currentMembership.expiresAt) {
+                        const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+                        if (exp > new Date()) hasAccess = true;
+                    }
+
+                    if (!hasAccess) {
+                        document.getElementById('main-view').classList.add('blur-background');
+                        const hasPaidFull = data.hasPaidFullMembership === true;
+                        
+                        document.getElementById('plan-card-full').style.display = hasPaidFull ? 'none' : 'flex';
+                        document.getElementById('plan-card-full-yearly').style.display = hasPaidFull ? 'none' : 'flex';
+                        
+                        const yearlyInput = document.querySelector('input[value="annual_renew"]');
+                        if (hasPaidFull) {
+                            yearlyInput.disabled = false;
+                            document.getElementById('plan-card-annual-renew').style.opacity = '1';
+                        } else {
+                            yearlyInput.disabled = true;
+                            document.getElementById('plan-card-annual-renew').style.opacity = '0.5';
+                        }
+                        
+                        // Reset selection
+                        document.querySelectorAll('input[name="plan_choice"]').forEach(r => r.checked = false);
+                        document.getElementById('payment-instructions').style.display = 'none';
+                        document.getElementById('btn-submit-plan').disabled = true;
+                        document.getElementById('btn-cancel-plan').style.display = 'none';
+                        
+                        planModal.classList.add('active');
+                    } else {
+                        document.getElementById('main-view').classList.remove('blur-background');
+                        planModal.classList.remove('active');
+                    }
+                } else {
+                    document.getElementById('main-view').classList.remove('blur-background');
+                    planModal.classList.remove('active');
+                }
             }
         } catch(e) { console.error(e); }
         
@@ -300,11 +341,11 @@ document.getElementById('btn-submit-plan').addEventListener('click', async () =>
             "membership.status": "pending_payment",
             "membership.pendingPlan": selectedPlan
         });
-        currentMembership.status = "pending_payment";
+        currentMembership.status = 'pending_payment';
         currentMembership.pendingPlan = selectedPlan;
         updateMembershipUI(currentMembership);
-        
         planModal.classList.remove('active');
+        document.getElementById('main-view').classList.remove('blur-background');
         alert("Your request has been sent! Please ensure you've emailed the screenshot to saunatranholmen@gmail.com.");
     } catch (e) {
         errEl.textContent = e.message;
@@ -1125,10 +1166,12 @@ async function handleAdminAction(e) {
         const uDoc = await getDoc(uRef);
         const uData = uDoc.data();
         let m = uData.membership || { expiresAt: null, isRemoved: false };
+        let hasPaid = uData.hasPaidFullMembership || false;
         
         if (action === 'approve_plan') {
             m.status = 'approved_pending_start';
             m.plan = m.pendingPlan;
+            if (m.plan === 'full' || m.plan === 'full_yearly') hasPaid = true;
             m.pendingPlan = null;
         } else if (action === 'reject_plan') {
             m.status = 'none';
@@ -1158,7 +1201,7 @@ async function handleAdminAction(e) {
             }
         }
         
-        await updateDoc(uRef, { membership: m });
+        await updateDoc(uRef, { membership: m, hasPaidFullMembership: hasPaid });
         renderAdminUsers(); // Refresh list
     } catch (err) {
         alert("Action failed: " + err.message);
