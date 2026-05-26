@@ -266,6 +266,7 @@ onAuthStateChanged(auth, async (user) => {
                 if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin') {
                     let hasAccess = false;
                     if (currentMembership.status === 'approved_pending_start') hasAccess = true;
+                    if (currentMembership.status === 'pending_payment') hasAccess = true;
                     if (currentMembership.status === 'active' && currentMembership.expiresAt) {
                         const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
                         if (exp > new Date()) hasAccess = true;
@@ -588,6 +589,11 @@ window.handleSlotClick = function(el) {
     const isPast = slotDateTime < now;
 
     if (isPast && currentRole !== 'admin') return;
+    
+    if (MEMBERSHIP_ENFORCEMENT_ENABLED && currentRole !== 'admin' && currentMembership && currentMembership.status === 'pending_payment') {
+        alert("Your payment is currently pending approval. You cannot book or modify slots until an admin approves it.");
+        return;
+    }
 
     targetSlot = { date, time };
     existingBooking = currentBookings.find(b => b.date === date && b.time === time);
@@ -1187,6 +1193,32 @@ async function renderAdminUsers() {
             { title: "No Membership", data: noMembershipUsers },
             { title: "Restricted Accounts", data: restrictedUsersList }
         ];
+
+        if(ptbody) {
+            ptbody.innerHTML = "";
+            if (pendingUsers.length === 0) {
+                ptbody.innerHTML = "<tr><td colspan='3'>No pending approvals.</td></tr>";
+            } else {
+                pendingUsers.forEach(u => {
+                    const m = u.membership;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>
+                            <strong>${u.screenname}</strong><br>
+                            <span class="user-email">${u.email}</span>
+                        </td>
+                        <td><strong>${m.pendingPlan}</strong></td>
+                        <td>
+                            <div class="mgt-btn-group">
+                                <button class="mgt-btn primary" data-action="approve_plan" data-id="${u.uid}">Approve</button>
+                                <button class="mgt-btn danger" data-action="reject_plan" data-id="${u.uid}">Reject</button>
+                            </div>
+                        </td>
+                    `;
+                    ptbody.appendChild(tr);
+                });
+            }
+        }
 
         tbody.innerHTML = "";
 
