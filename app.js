@@ -794,14 +794,7 @@ async function executeBookingAction() {
             
             // Unbook reset logic
             if (MEMBERSHIP_ENFORCEMENT_ENABLED && !['admin', 'moderator'].includes(currentRole) && currentMembership && currentMembership.status === 'active') {
-                const now = new Date();
-                const userQuery = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
-                const userSnap = await getDocs(userQuery);
-                let remainingBookings = userSnap.docs
-                    .map(d => ({ id: d.id, ...d.data() }))
-                    .filter(b => !targetBlockIds.includes(b.id));
-                
-                let actDate;
+                let actDate = null;
                 if (currentMembership.activatedAt) {
                     actDate = currentMembership.activatedAt.toDate ? currentMembership.activatedAt.toDate() : new Date(currentMembership.activatedAt);
                 } else if (currentMembership.expiresAt && currentMembership.plan) {
@@ -816,51 +809,58 @@ async function executeBookingAction() {
                         actDate.setDate(actDate.getDate() - 7 + 1);
                     }
                     actDate.setHours(0,0,0,0);
-                } else {
-                    actDate = new Date(0);
                 }
                 
-                let hasUsedSaunaOnThisPlan = false;
-                let earliestFutureBooking = null;
-
-                remainingBookings.forEach(b => {
-                    const [y, mNum, dNum] = b.date.split('-').map(Number);
-                    const [hrs, mins] = b.time.split(':').map(Number);
-                    const bDate = new Date(y, mNum - 1, dNum, hrs, mins);
+                const now = new Date();
+                
+                // ONLY shift if the membership hasn't started yet!
+                if (actDate && actDate > now) {
+                    const userQuery = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
+                    const userSnap = await getDocs(userQuery);
+                    let remainingBookings = userSnap.docs
+                        .map(d => ({ id: d.id, ...d.data() }))
+                        .filter(b => !targetBlockIds.includes(b.id));
                     
-                    if (bDate >= actDate) {
-                        if (bDate < now) {
-                            hasUsedSaunaOnThisPlan = true;
-                        } else {
+                    let earliestFutureBooking = null;
+
+                    remainingBookings.forEach(b => {
+                        const [y, mNum, dNum] = b.date.split('-').map(Number);
+                        const [hrs, mins] = b.time.split(':').map(Number);
+                        const bDate = new Date(y, mNum - 1, dNum, hrs, mins);
+                        
+                        if (bDate > now) {
                             if (!earliestFutureBooking || bDate < earliestFutureBooking) {
                                 earliestFutureBooking = bDate;
                             }
                         }
-                    }
-                });
+                    });
 
-                if (!hasUsedSaunaOnThisPlan) {
                     if (earliestFutureBooking) {
                         // Shift activation to this new future booking
                         let newActDate = new Date(earliestFutureBooking.getFullYear(), earliestFutureBooking.getMonth(), earliestFutureBooking.getDate(), 0, 0, 0);
-                        let expDate = new Date(newActDate);
-                        expDate.setHours(23, 59, 59, 999);
                         
-                        if (currentMembership.plan && currentMembership.plan.startsWith('annual')) {
-                            expDate.setFullYear(expDate.getFullYear() + 1);
-                            expDate.setDate(expDate.getDate() - 1);
-                        } else if (currentMembership.plan === 'monthly') {
-                            expDate.setDate(expDate.getDate() + 30 - 1);
-                        } else if (currentMembership.plan === 'weekly') {
-                            expDate.setDate(expDate.getDate() + 7 - 1);
+                        // If it's different from the current actDate, update it!
+                        if (newActDate.getTime() !== actDate.getTime()) {
+                            let expDate = new Date(newActDate);
+                            expDate.setHours(23, 59, 59, 999);
+                            
+                            if (currentMembership.plan && currentMembership.plan.startsWith('annual')) {
+                                expDate.setFullYear(expDate.getFullYear() + 1);
+                                expDate.setDate(expDate.getDate() - 1);
+                            } else if (currentMembership.plan === 'monthly') {
+                                expDate.setDate(expDate.getDate() + 30 - 1);
+                            } else if (currentMembership.plan === 'weekly') {
+                                expDate.setDate(expDate.getDate() + 7 - 1);
+                            }
+                            
+                            await updateDoc(doc(db, "users", currentUser.uid), {
+                                "membership.activatedAt": newActDate,
+                                "membership.expiresAt": expDate
+                            });
+                            currentMembership.activatedAt = newActDate;
+                            currentMembership.expiresAt = expDate;
+                            updateMembershipUI(currentMembership);
                         }
-                        
-                        await updateDoc(doc(db, "users", currentUser.uid), {
-                            "membership.activatedAt": newActDate,
-                            "membership.expiresAt": expDate
-                        });
-                        currentMembership.activatedAt = newActDate;
-                        currentMembership.expiresAt = expDate;
                     } else {
                         // Completely revert to approved_pending_start
                         await updateDoc(doc(db, "users", currentUser.uid), {
@@ -871,8 +871,8 @@ async function executeBookingAction() {
                         currentMembership.status = "approved_pending_start";
                         currentMembership.activatedAt = null;
                         currentMembership.expiresAt = null;
+                        updateMembershipUI(currentMembership);
                     }
-                    updateMembershipUI(currentMembership);
                 }
             }
             
@@ -881,31 +881,60 @@ async function executeBookingAction() {
     } else {
         // Create new bookings via Promise.all
         try {
-            // First check if they are starting a new membership plan
-            if (MEMBERSHIP_ENFORCEMENT_ENABLED && !['admin', 'moderator'].includes(currentRole) && currentMembership && currentMembership.status === 'approved_pending_start') {
+            if (MEMBERSHIP_ENFORCEMENT_ENABLED && !['admin', 'moderator'].includes(currentRole) && currentMembership) {
                 const [y, mm, dNum] = targetSlot.date.split('-').map(Number);
                 let activeDate = new Date(y, mm - 1, dNum, 0, 0, 0);
-                let expDate = new Date(activeDate);
-                expDate.setHours(23, 59, 59, 999);
+
+                let shouldUpdateMembership = false;
                 
-                if (currentMembership.plan && currentMembership.plan.startsWith('annual')) {
-                    expDate.setFullYear(expDate.getFullYear() + 1);
-                    expDate.setDate(expDate.getDate() - 1);
-                } else if (currentMembership.plan === 'monthly') {
-                    expDate.setDate(expDate.getDate() + 30 - 1);
-                } else if (currentMembership.plan === 'weekly') {
-                    expDate.setDate(expDate.getDate() + 7 - 1);
+                if (currentMembership.status === 'approved_pending_start') {
+                    shouldUpdateMembership = true;
+                } else if (currentMembership.status === 'active') {
+                    let currentActDate = null;
+                    if (currentMembership.activatedAt) {
+                        currentActDate = currentMembership.activatedAt.toDate ? currentMembership.activatedAt.toDate() : new Date(currentMembership.activatedAt);
+                    } else if (currentMembership.expiresAt && currentMembership.plan) {
+                        let exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+                        currentActDate = new Date(exp);
+                        if (currentMembership.plan.startsWith('annual')) {
+                            currentActDate.setFullYear(currentActDate.getFullYear() - 1);
+                            currentActDate.setDate(currentActDate.getDate() + 1);
+                        } else if (currentMembership.plan === 'monthly') {
+                            currentActDate.setDate(currentActDate.getDate() - 30 + 1);
+                        } else if (currentMembership.plan === 'weekly') {
+                            currentActDate.setDate(currentActDate.getDate() - 7 + 1);
+                        }
+                        currentActDate.setHours(0,0,0,0);
+                    }
+                    
+                    if (currentActDate && activeDate < currentActDate && currentActDate > new Date()) {
+                        shouldUpdateMembership = true;
+                    }
                 }
-                
-                await updateDoc(doc(db, "users", currentUser.uid), {
-                    "membership.status": "active",
-                    "membership.expiresAt": expDate,
-                    "membership.activatedAt": activeDate
-                });
-                currentMembership.status = "active";
-                currentMembership.expiresAt = expDate;
-                currentMembership.activatedAt = activeDate;
-                updateMembershipUI(currentMembership);
+
+                if (shouldUpdateMembership) {
+                    let expDate = new Date(activeDate);
+                    expDate.setHours(23, 59, 59, 999);
+                    
+                    if (currentMembership.plan && currentMembership.plan.startsWith('annual')) {
+                        expDate.setFullYear(expDate.getFullYear() + 1);
+                        expDate.setDate(expDate.getDate() - 1);
+                    } else if (currentMembership.plan === 'monthly') {
+                        expDate.setDate(expDate.getDate() + 30 - 1);
+                    } else if (currentMembership.plan === 'weekly') {
+                        expDate.setDate(expDate.getDate() + 7 - 1);
+                    }
+                    
+                    await updateDoc(doc(db, "users", currentUser.uid), {
+                        "membership.status": "active",
+                        "membership.expiresAt": expDate,
+                        "membership.activatedAt": activeDate
+                    });
+                    currentMembership.status = "active";
+                    currentMembership.expiresAt = expDate;
+                    currentMembership.activatedAt = activeDate;
+                    updateMembershipUI(currentMembership);
+                }
             }
 
             const timesToBook = JSON.parse(endTimeSelect.value);
