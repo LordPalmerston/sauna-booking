@@ -61,7 +61,7 @@ const membershipBadge = document.getElementById('membership-badge');
 const planModal = document.getElementById('plan-selection-modal');
 
 // === FEATURE TOGGLES ===
-const MEMBERSHIP_ENFORCEMENT_ENABLED = false; // Set to false to allow everyone to book and see the door code (except restricted users)
+const MEMBERSHIP_ENFORCEMENT_ENABLED = true; // Set to false to allow everyone to book and see the door code (except restricted users)
 
 let currentDoorCode = "";
 let unsubscribeDoorCode = null;
