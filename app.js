@@ -1488,17 +1488,31 @@ if (btnFix2026) {
                         }
                     }
                     
-                    // Fix 2: pending start but has existing bookings
-                    if (!needsUpdate && m.status === 'approved_pending_start') {
+                    // Fix 2: pending start or incorrectly activated before June 1st
+                    const launchDate = new Date(2026, 5, 1, 0, 0, 0); // June 1, 2026
+                    let checkPendingOrBadActive = false;
+                    
+                    if (m.status === 'approved_pending_start') {
+                        checkPendingOrBadActive = true;
+                    } else if (m.status === 'active' && m.activatedAt) {
+                        let act = m.activatedAt.toDate ? m.activatedAt.toDate() : new Date(m.activatedAt);
+                        if (act < launchDate) {
+                            checkPendingOrBadActive = true;
+                        }
+                    }
+
+                    if (!needsUpdate && checkPendingOrBadActive) {
                         const userBookings = bookingsByUserId[docSnap.id] || [];
                         let earliestBookingDate = null;
                         
                         userBookings.forEach(b => {
-                            const [y, mNum, dNum] = b.date.split('-').map(Number);
-                            const [hrs, mins] = b.time.split(':').map(Number);
-                            const bDate = new Date(y, mNum - 1, dNum, hrs, mins);
-                            if (!earliestBookingDate || bDate < earliestBookingDate) {
-                                earliestBookingDate = bDate;
+                            if (b.date >= '2026-06-01') {
+                                const [y, mNum, dNum] = b.date.split('-').map(Number);
+                                const [hrs, mins] = b.time.split(':').map(Number);
+                                const bDate = new Date(y, mNum - 1, dNum, hrs, mins);
+                                if (!earliestBookingDate || bDate < earliestBookingDate) {
+                                    earliestBookingDate = bDate;
+                                }
                             }
                         });
                         
@@ -1519,6 +1533,12 @@ if (btnFix2026) {
                             updateData["membership.status"] = "active";
                             updateData["membership.activatedAt"] = activeDate;
                             updateData["membership.expiresAt"] = expDate;
+                            needsUpdate = true;
+                        } else if (m.status === 'active') {
+                            // Revert incorrectly activated users who have no valid post-launch bookings
+                            updateData["membership.status"] = "approved_pending_start";
+                            updateData["membership.activatedAt"] = null;
+                            updateData["membership.expiresAt"] = null;
                             needsUpdate = true;
                         }
                     }
