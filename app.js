@@ -1445,6 +1445,39 @@ document.getElementById('btn-export-users-csv').addEventListener('click', async 
     } catch (e) { alert("Failed to export: " + e.message); }
 });
 
+const btnFix2026 = document.getElementById('btn-fix-2026');
+if (btnFix2026) {
+    btnFix2026.addEventListener('click', async () => {
+        btnFix2026.disabled = true;
+        btnFix2026.textContent = "Fixing...";
+        try {
+            const snap = await getDocs(collection(db, "users"));
+            let fixedCount = 0;
+            const promises = [];
+            
+            snap.forEach(docSnap => {
+                const uData = docSnap.data();
+                if (uData.membership && uData.membership.plan === 'full_yearly' && uData.membership.expiresAt) {
+                    let exp = uData.membership.expiresAt.toDate ? uData.membership.expiresAt.toDate() : new Date(uData.membership.expiresAt);
+                    if (exp.getFullYear() === 2026) {
+                        exp.setFullYear(2027);
+                        promises.push(updateDoc(docSnap.ref, { "membership.expiresAt": exp }));
+                        fixedCount++;
+                    }
+                }
+            });
+            
+            await Promise.all(promises);
+            alert(`Successfully fixed ${fixedCount} user(s)!`);
+            renderAdminUsers();
+        } catch (e) {
+            alert("Error fixing users: " + e.message);
+        }
+        btnFix2026.textContent = "Fix 2026 Expirations";
+        btnFix2026.disabled = false;
+    });
+}
+
 if (btnUpdateDoorCode) {
     btnUpdateDoorCode.addEventListener('click', async () => {
         const newCode = adminDoorCodeInput.value.trim();
