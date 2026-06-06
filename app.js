@@ -1461,7 +1461,11 @@ if (btnFix2026) {
                     let exp = uData.membership.expiresAt.toDate ? uData.membership.expiresAt.toDate() : new Date(uData.membership.expiresAt);
                     if (exp.getFullYear() === 2026) {
                         exp.setFullYear(2027);
-                        promises.push(updateDoc(docSnap.ref, { "membership.expiresAt": exp }));
+                        promises.push(updateDoc(docSnap.ref, { 
+                            "membership.expiresAt": exp,
+                            "membership.status": "active",
+                            "membership.pendingPlan": null
+                        }));
                         fixedCount++;
                     }
                 }
