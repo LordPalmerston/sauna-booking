@@ -1451,23 +1451,82 @@ if (btnFix2026) {
         btnFix2026.disabled = true;
         btnFix2026.textContent = "Fixing...";
         try {
-            const snap = await getDocs(collection(db, "users"));
+            const usersSnap = await getDocs(collection(db, "users"));
+            const bookingsSnap = await getDocs(collection(db, "bookings"));
+            
+            // Map bookings by userId
+            const bookingsByUserId = {};
+            bookingsSnap.docs.forEach(d => {
+                const b = d.data();
+                if (!bookingsByUserId[b.userId]) bookingsByUserId[b.userId] = [];
+                bookingsByUserId[b.userId].push(b);
+            });
+            
             let fixedCount = 0;
             const promises = [];
             
-            snap.forEach(docSnap => {
+            usersSnap.forEach(docSnap => {
                 const uData = docSnap.data();
-                if (uData.membership && uData.membership.plan === 'full_yearly' && uData.membership.expiresAt) {
-                    let exp = uData.membership.expiresAt.toDate ? uData.membership.expiresAt.toDate() : new Date(uData.membership.expiresAt);
-                    if (exp.getFullYear() === 2026) {
-                        exp.setFullYear(2027);
-                        promises.push(updateDoc(docSnap.ref, { 
-                            "membership.expiresAt": exp,
-                            "membership.status": "active",
-                            "membership.pendingPlan": null
-                        }));
-                        fixedCount++;
+                const m = uData.membership;
+                let needsUpdate = false;
+                let updateData = {};
+                
+                if (m) {
+                    // Fix 1: The 2026/2027 panic bug
+                    if (m.plan === 'full_yearly' && m.expiresAt) {
+                        let exp = m.expiresAt.toDate ? m.expiresAt.toDate() : new Date(m.expiresAt);
+                        if (exp.getFullYear() === 2026) {
+                            exp.setFullYear(2027);
+                            updateData["membership.expiresAt"] = exp;
+                            updateData["membership.status"] = "active";
+                            updateData["membership.pendingPlan"] = null;
+                            needsUpdate = true;
+                        } else if (exp.getFullYear() === 2027 && m.status !== 'active') {
+                            updateData["membership.status"] = "active";
+                            updateData["membership.pendingPlan"] = null;
+                            needsUpdate = true;
+                        }
                     }
+                    
+                    // Fix 2: pending start but has existing bookings
+                    if (!needsUpdate && m.status === 'approved_pending_start') {
+                        const userBookings = bookingsByUserId[docSnap.id] || [];
+                        let earliestBookingDate = null;
+                        
+                        userBookings.forEach(b => {
+                            const [y, mNum, dNum] = b.date.split('-').map(Number);
+                            const [hrs, mins] = b.time.split(':').map(Number);
+                            const bDate = new Date(y, mNum - 1, dNum, hrs, mins);
+                            if (!earliestBookingDate || bDate < earliestBookingDate) {
+                                earliestBookingDate = bDate;
+                            }
+                        });
+                        
+                        if (earliestBookingDate) {
+                            let activeDate = new Date(earliestBookingDate.getFullYear(), earliestBookingDate.getMonth(), earliestBookingDate.getDate(), 0, 0, 0);
+                            let expDate = new Date(activeDate);
+                            expDate.setHours(23, 59, 59, 999);
+                            
+                            if (m.plan === 'full_yearly' || (m.plan && m.plan.startsWith('annual'))) {
+                                expDate.setFullYear(expDate.getFullYear() + 1);
+                                expDate.setDate(expDate.getDate() - 1);
+                            } else if (m.plan === 'monthly') {
+                                expDate.setDate(expDate.getDate() + 30 - 1);
+                            } else if (m.plan === 'weekly') {
+                                expDate.setDate(expDate.getDate() + 7 - 1);
+                            }
+                            
+                            updateData["membership.status"] = "active";
+                            updateData["membership.activatedAt"] = activeDate;
+                            updateData["membership.expiresAt"] = expDate;
+                            needsUpdate = true;
+                        }
+                    }
+                }
+                
+                if (needsUpdate) {
+                    promises.push(updateDoc(docSnap.ref, updateData));
+                    fixedCount++;
                 }
             });
             
