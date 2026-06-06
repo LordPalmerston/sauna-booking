@@ -800,7 +800,7 @@ async function executeBookingAction() {
                 } else if (currentMembership.expiresAt && currentMembership.plan) {
                     let exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
                     actDate = new Date(exp);
-                    if (currentMembership.plan.startsWith('annual')) {
+                    if (currentMembership.plan === 'full_yearly' || currentMembership.plan.startsWith('annual')) {
                         actDate.setFullYear(actDate.getFullYear() - 1);
                         actDate.setDate(actDate.getDate() + 1);
                     } else if (currentMembership.plan === 'monthly') {
@@ -844,7 +844,7 @@ async function executeBookingAction() {
                             let expDate = new Date(newActDate);
                             expDate.setHours(23, 59, 59, 999);
                             
-                            if (currentMembership.plan && currentMembership.plan.startsWith('annual')) {
+                            if (currentMembership.plan && (currentMembership.plan === 'full_yearly' || currentMembership.plan.startsWith('annual'))) {
                                 expDate.setFullYear(expDate.getFullYear() + 1);
                                 expDate.setDate(expDate.getDate() - 1);
                             } else if (currentMembership.plan === 'monthly') {
@@ -896,7 +896,7 @@ async function executeBookingAction() {
                     } else if (currentMembership.expiresAt && currentMembership.plan) {
                         let exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
                         currentActDate = new Date(exp);
-                        if (currentMembership.plan.startsWith('annual')) {
+                        if (currentMembership.plan === 'full_yearly' || currentMembership.plan.startsWith('annual')) {
                             currentActDate.setFullYear(currentActDate.getFullYear() - 1);
                             currentActDate.setDate(currentActDate.getDate() + 1);
                         } else if (currentMembership.plan === 'monthly') {
@@ -916,7 +916,7 @@ async function executeBookingAction() {
                     let expDate = new Date(activeDate);
                     expDate.setHours(23, 59, 59, 999);
                     
-                    if (currentMembership.plan && currentMembership.plan.startsWith('annual')) {
+                    if (currentMembership.plan && (currentMembership.plan === 'full_yearly' || currentMembership.plan.startsWith('annual'))) {
                         expDate.setFullYear(expDate.getFullYear() + 1);
                         expDate.setDate(expDate.getDate() - 1);
                     } else if (currentMembership.plan === 'monthly') {
