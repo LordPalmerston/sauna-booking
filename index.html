@@ -308,6 +308,25 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=1.12"></script>
+    <!-- Admin Coupling Modal -->
+    <div id="coupling-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3>Couple Accounts</h3>
+            <p style="color:var(--text-muted); font-size: 0.9rem; margin-top: 5px;">Select a user to link with this account.</p>
+            
+            <div class="input-group" style="margin: 20px 0;">
+                <label for="coupling-user-select">Select Partner</label>
+                <select id="coupling-user-select" style="width:100%; padding: 12px; border-radius:var(--border-radius); background:var(--bg-color); color:var(--text-main); border:1px solid var(--border-color);"></select>
+            </div>
+
+            <div class="modal-actions" style="margin-top:20px; display:flex;">
+                <button id="btn-save-coupling" class="primary-btn">Link Accounts</button>
+                <button id="btn-cancel-coupling" class="outline-btn" style="margin-left: 10px;">Cancel</button>
+            </div>
+            <p id="coupling-modal-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <script type="module" src="app.js?v=1.13"></script>
 </body>
 </html>

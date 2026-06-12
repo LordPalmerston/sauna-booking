@@ -19,10 +19,13 @@ const db = getFirestore(app);
 // === APP STATE ===
 const INVITE_CODE_USER = "TRANHOLMEN";
 const INVITE_CODE_ADMIN = "ADMIN777";
+console.log("🔥 Sauna Booking App v1.13 Loaded (Coupling Feature Active!)");
 
 let currentUser = null;
 let currentRole = 'user';
 let currentMembership = null; // { expiresAt, isRemoved }
+let currentCoupledWithUid = null;
+let currentHouseholdId = null;
 let currentWeekOffset = 0;
 let unsubscribeBookings = null;
 let unsubscribeMyBookings = null;
@@ -256,6 +259,8 @@ onAuthStateChanged(auth, async (user) => {
                 const data = uDoc.data();
                 currentRole = data.role;
                 currentMembership = data.membership || { expiresAt: null, isRemoved: false, status: 'none' };
+                currentCoupledWithUid = data.coupledWithUid || null;
+                currentHouseholdId = data.householdId || null;
                 
                 if (currentMembership.isRemoved && !['admin', 'moderator'].includes(currentRole)) {
                     alert("Your account has been removed. Please contact the administrator.");
@@ -421,7 +426,11 @@ function listenToDoorCode() {
 
 function listenToMyBookings() {
     if (unsubscribeMyBookings) unsubscribeMyBookings();
-    const q = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
+    if (!currentUser) return;
+    
+    let uids = [currentUser.uid];
+    if (currentCoupledWithUid) uids.push(currentCoupledWithUid);
+    const q = query(collection(db, "bookings"), where("userId", "in", uids));
     
     unsubscribeMyBookings = onSnapshot(q, (snapshot) => {
         const todayStr = formatDate(new Date());
@@ -721,7 +730,7 @@ if (existingBooking && existingBooking.userId !== currentUser.uid && !['admin', 
                 const [by, bm, bd_num] = b.date.split('-').map(Number);
                 const dayObj = new Date(by, bm - 1, bd_num);
                 const bd_day = dayObj.getDay();
-                return b.userId === currentUser.uid && b.status !== 'maintenance' && (bd_day === 5 || bd_day === 6);
+                return (b.userId === currentUser.uid || b.userId === currentCoupledWithUid) && b.status !== 'maintenance' && (bd_day === 5 || bd_day === 6);
             });
             maxSlots = Math.max(0, 3 - weekendBookings.length);
         }
@@ -815,7 +824,9 @@ async function executeBookingAction() {
                 
                 // ONLY shift if the membership hasn't started yet!
                 if (actDate && actDate > now) {
-                    const userQuery = query(collection(db, "bookings"), where("userId", "==", currentUser.uid));
+                    let uids = [currentUser.uid];
+                    if (currentCoupledWithUid) uids.push(currentCoupledWithUid);
+                    const userQuery = query(collection(db, "bookings"), where("userId", "in", uids));
                     const userSnap = await getDocs(userQuery);
                     let remainingBookings = userSnap.docs
                         .map(d => ({ id: d.id, ...d.data() }))
@@ -853,21 +864,29 @@ async function executeBookingAction() {
                                 expDate.setDate(expDate.getDate() + 7 - 1);
                             }
                             
-                            await updateDoc(doc(db, "users", currentUser.uid), {
+                            const updatePayload = {
                                 "membership.activatedAt": newActDate,
                                 "membership.expiresAt": expDate
-                            });
+                            };
+                            await updateDoc(doc(db, "users", currentUser.uid), updatePayload);
+                            if (currentCoupledWithUid) {
+                                await updateDoc(doc(db, "users", currentCoupledWithUid), updatePayload);
+                            }
                             currentMembership.activatedAt = newActDate;
                             currentMembership.expiresAt = expDate;
                             updateMembershipUI(currentMembership);
                         }
                     } else {
                         // Completely revert to approved_pending_start
-                        await updateDoc(doc(db, "users", currentUser.uid), {
+                        const revertPayload = {
                             "membership.status": "approved_pending_start",
                             "membership.activatedAt": null,
                             "membership.expiresAt": null
-                        });
+                        };
+                        await updateDoc(doc(db, "users", currentUser.uid), revertPayload);
+                        if (currentCoupledWithUid) {
+                            await updateDoc(doc(db, "users", currentCoupledWithUid), revertPayload);
+                        }
                         currentMembership.status = "approved_pending_start";
                         currentMembership.activatedAt = null;
                         currentMembership.expiresAt = null;
@@ -925,11 +944,15 @@ async function executeBookingAction() {
                         expDate.setDate(expDate.getDate() + 7 - 1);
                     }
                     
-                    await updateDoc(doc(db, "users", currentUser.uid), {
+                    const updatePayload = {
                         "membership.status": "active",
                         "membership.expiresAt": expDate,
                         "membership.activatedAt": activeDate
-                    });
+                    };
+                    await updateDoc(doc(db, "users", currentUser.uid), updatePayload);
+                    if (currentCoupledWithUid) {
+                        await updateDoc(doc(db, "users", currentCoupledWithUid), updatePayload);
+                    }
                     currentMembership.status = "active";
                     currentMembership.expiresAt = expDate;
                     currentMembership.activatedAt = activeDate;
@@ -1171,6 +1194,8 @@ async function renderAdminUsers() {
         const weeklyUsers = [];
         const noMembershipUsers = [];
         const restrictedUsersList = [];
+        
+        window.allAdminUsers = [];
 
         snap.docs.forEach(docSnap => {
             const u = docSnap.data();
@@ -1192,6 +1217,7 @@ async function renderAdminUsers() {
             }
 
             const userObj = { uid, ...u, membership: m };
+            window.allAdminUsers.push(userObj);
 
             if (u.role === 'admin') {
                 adminUsers.push(userObj);
@@ -1313,14 +1339,24 @@ async function renderAdminUsers() {
                         ? `<button class="mgt-btn primary" data-action="remove_mod" data-id="${uid}" style="font-size:0.7rem; padding: 4px;">Demote Mod</button>`
                         : (u.role !== 'admin' ? `<button class="mgt-btn primary" data-action="make_mod" data-id="${uid}" style="font-size:0.7rem; padding: 4px;">Appoint Mod</button>` : '');
                         
+                    const coupleBtnHTML = u.coupledWithUid
+                        ? `<button class="mgt-btn danger" data-action="uncouple_account" data-id="${uid}" style="font-size:0.7rem; padding: 4px;">Uncouple</button>`
+                        : `<button class="mgt-btn primary" data-action="couple_account" data-id="${uid}" style="font-size:0.7rem; padding: 4px; background:var(--secondary-color);">Couple Account</button>`;
+
                     actionsHTML = `
                         <td style="white-space:nowrap;">
                             <div class="mgt-btn-group" style="gap:5px;">
                                 <button class="mgt-btn danger" data-action="revoke_plan" data-id="${uid}" style="font-size:0.7rem; padding: 4px;">Revoke Plan</button>
                                 ${modBtnHTML}
+                                ${coupleBtnHTML}
                             </div>
                         </td>
                     `;
+                }
+
+                let coupledBadge = '';
+                if (u.coupledWithName) {
+                    coupledBadge = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; font-weight: 500;">🔗 Coupled with ${u.coupledWithName}</div>`;
                 }
 
                 tr.innerHTML = `
@@ -1332,6 +1368,7 @@ async function renderAdminUsers() {
                             </div>
                             <span class="user-email">${u.email}</span>
                             <span style="font-size:0.6rem; color:var(--primary-color)">${u.role.toUpperCase()}</span>
+                            ${coupledBadge}
                         </div>
                     </td>
                     <td>${expiryStr}</td>
@@ -1401,9 +1438,50 @@ async function handleAdminAction(e) {
         } else if (action === 'restore') {
             if (currentRole !== 'admin') { btn.disabled = false; return; }
             m.isRemoved = false;
+        } else if (action === 'couple_account') {
+            if (currentRole !== 'admin') { btn.disabled = false; return; }
+            targetCoupleUid = uid;
+            const select = document.getElementById('coupling-user-select');
+            select.innerHTML = '<option value="">-- Select Partner --</option>';
+            window.allAdminUsers.forEach(user => {
+                if (user.uid !== uid && !user.coupledWithUid && user.role !== 'admin') {
+                    select.innerHTML += `<option value="${user.uid}">${user.screenname} (${user.email})</option>`;
+                }
+            });
+            document.getElementById('coupling-modal').classList.add('active');
+            btn.disabled = false;
+            return;
+        } else if (action === 'uncouple_account') {
+            if (currentRole !== 'admin') { btn.disabled = false; return; }
+            if (!confirm("Are you sure you want to uncouple this household?")) { btn.disabled = false; return; }
+            
+            const partnerUid = uData.coupledWithUid;
+            if (partnerUid) {
+                await updateDoc(doc(db, "users", partnerUid), {
+                    coupledWithUid: null,
+                    coupledWithName: null,
+                    householdId: null
+                });
+            }
+            await updateDoc(uRef, {
+                coupledWithUid: null,
+                coupledWithName: null,
+                householdId: null
+            });
+            renderAdminUsers();
+            return;
         }
         
         await updateDoc(uRef, { membership: m, hasPaidFullMembership: hasPaid, role: uRole });
+        
+        // SYNC PARTNER MEMBERSHIP
+        if (['approve_plan', 'reject_plan', 'revoke_plan'].includes(action) && uData.coupledWithUid) {
+            await updateDoc(doc(db, "users", uData.coupledWithUid), {
+                membership: m,
+                hasPaidFullMembership: hasPaid
+            });
+        }
+        
         renderAdminUsers(); // Refresh list
     } catch (err) {
         alert("Action failed: " + err.message);
@@ -1426,6 +1504,81 @@ document.getElementById('btn-export-csv').addEventListener('click', async () => 
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } catch (e) { alert("Failed to export: " + e.message); }
 });
+
+let targetCoupleUid = null;
+const couplingModal = document.getElementById('coupling-modal');
+
+if (document.getElementById('btn-cancel-coupling')) {
+    document.getElementById('btn-cancel-coupling').addEventListener('click', () => {
+        couplingModal.classList.remove('active');
+    });
+
+    document.getElementById('btn-save-coupling').addEventListener('click', async () => {
+        const partnerUid = document.getElementById('coupling-user-select').value;
+        const errEl = document.getElementById('coupling-modal-error');
+        if (!partnerUid) {
+            errEl.textContent = "Please select a partner.";
+            return;
+        }
+        
+        document.getElementById('btn-save-coupling').disabled = true;
+        errEl.textContent = "Linking accounts...";
+        
+        try {
+            const u1Doc = await getDoc(doc(db, "users", targetCoupleUid));
+            const u2Doc = await getDoc(doc(db, "users", partnerUid));
+            
+            const u1 = u1Doc.data();
+            const u2 = u2Doc.data();
+            
+            const householdId = `hh_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+            
+            let bestMembership = { expiresAt: null, isRemoved: false, status: 'none', plan: null };
+            let hasPaid = false;
+            
+            const getRank = (m) => {
+                if (!m) return 0;
+                if (m.status === 'active') return 3;
+                if (m.status === 'approved_pending_start') return 2;
+                if (m.status === 'pending_payment') return 1;
+                return 0;
+            };
+            
+            const r1 = getRank(u1.membership);
+            const r2 = getRank(u2.membership);
+            
+            if (r1 >= r2 && r1 > 0) {
+                bestMembership = u1.membership;
+                hasPaid = u1.hasPaidFullMembership || false;
+            } else if (r2 > 0) {
+                bestMembership = u2.membership;
+                hasPaid = u2.hasPaidFullMembership || false;
+            }
+            
+            await updateDoc(doc(db, "users", targetCoupleUid), {
+                coupledWithUid: partnerUid,
+                coupledWithName: u2.screenname,
+                householdId: householdId,
+                membership: bestMembership,
+                hasPaidFullMembership: hasPaid
+            });
+            
+            await updateDoc(doc(db, "users", partnerUid), {
+                coupledWithUid: targetCoupleUid,
+                coupledWithName: u1.screenname,
+                householdId: householdId,
+                membership: bestMembership,
+                hasPaidFullMembership: hasPaid
+            });
+            
+            couplingModal.classList.remove('active');
+            renderAdminUsers();
+        } catch(e) {
+            errEl.textContent = "Error: " + e.message;
+        }
+        document.getElementById('btn-save-coupling').disabled = false;
+    });
+}
 
 document.getElementById('btn-export-users-csv').addEventListener('click', async () => {
     try {
