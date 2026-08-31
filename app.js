@@ -256,6 +256,9 @@ onAuthStateChanged(auth, async (user) => {
         try {
             let uDoc = await getDoc(doc(db, "users", user.uid));
             if (!uDoc.exists()) {
+                // Auto-Repair: Orphaned Authentication Profiles
+                // If a user was added manually via Firebase Auth console (or hit a network error during registration),
+                // they can log in but lack a Firestore profile document. This safely generates a default profile for them.
                 await setDoc(doc(db, "users", user.uid), {
                     screenname: user.displayName || user.email.split('@')[0],
                     email: user.email,

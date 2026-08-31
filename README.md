@@ -56,3 +56,10 @@ To continue working on another machine:
 1. Clone the repository: `git clone https://github.com/LordPalmerston/sauna-booking.git`
 2. Open the folder in your code editor.
 3. Start your local server and you're good to go!
+
+## Known Edge Cases & Auto-Repairs
+
+### Orphaned Authentication Profiles
+Users added manually via the Firebase Authentication console (or who experience a network timeout precisely during registration) may be able to log in but lack a corresponding profile document in the Firestore `users` collection. This causes silent failures when attempting to select payment plans and results in the user not appearing in the Admin User Registry.
+
+**The Auto-Repair**: An auto-repair mechanism exists within `onAuthStateChanged` in `app.js`. If a user logs in and their Firestore `users` document is missing, the system will immediately generate a clean, safe default profile for them. This safely repairs their account without ever overwriting existing user data.
