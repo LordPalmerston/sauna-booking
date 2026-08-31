@@ -254,7 +254,18 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('user-display-name').textContent = `Hello, ${user.displayName || user.email}`;
         btns.admin.classList.toggle('hidden', !['admin', 'moderator'].includes(currentRole));
         try {
-            const uDoc = await getDoc(doc(db, "users", user.uid));
+            let uDoc = await getDoc(doc(db, "users", user.uid));
+            if (!uDoc.exists()) {
+                await setDoc(doc(db, "users", user.uid), {
+                    screenname: user.displayName || user.email.split('@')[0],
+                    email: user.email,
+                    role: 'user',
+                    createdAt: new Date(),
+                    hasPaidFullMembership: false,
+                    membership: { expiresAt: null, isRemoved: false, status: 'none', plan: null, pendingPlan: null }
+                });
+                uDoc = await getDoc(doc(db, "users", user.uid));
+            }
             if (uDoc.exists()) {
                 const data = uDoc.data();
                 currentRole = data.role;
