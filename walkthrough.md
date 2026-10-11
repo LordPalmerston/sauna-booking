@@ -31,6 +31,13 @@ The site strictly adheres to a premium light-warm palette:
 ### 5. Flash-less Authentication
 A loading interceptor UI aggressively intercepts the screen while the Firebase session spins up in the background (~0.5s), destroying the annoying visual flicker between the "Auth screen" and "Calendar View".
 
+### 6. Multi-Day Maintenance Range & Booking Restoration
+- **Two-Click Range Tool:** Admins and Moderators can click the **"🛠️ Maintenance Range"** button in the header, click a start slot, and click an end slot across days or weeks to instantly set a maintenance period.
+- **Custom Reason / Notes:** Admins can attach a message (e.g., *"Chimney inspection"*, *"Stove repair"*), which displays as a tag on the calendar and informs regular users why the sauna is closed.
+- **Conflict Warning & Safe Suspension:** If regular users had bookings within the maintenance window, their reservations are safely suspended instead of deleted.
+- **Early Completion & Restoration:** If maintenance finishes ahead of schedule, clicking a slot provides a **"Shorten: Clear from here onwards"** option. All suspended user bookings in reopened slots are automatically restored to the calendar.
+- **Non-blocking UX:** The entire flow runs without native browser popups to ensure smooth operation across all devices.
+
 ---
 
 ## 🤖 Automatic Deployment (Magic Workflow)

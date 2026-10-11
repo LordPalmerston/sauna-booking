@@ -63,3 +63,25 @@ To continue working on another machine:
 Users added manually via the Firebase Authentication console (or who experience a network timeout precisely during registration) may be able to log in but lack a corresponding profile document in the Firestore `users` collection. This causes silent failures when attempting to select payment plans and results in the user not appearing in the Admin User Registry.
 
 **The Auto-Repair**: An auto-repair mechanism exists within `onAuthStateChanged` in `app.js`. If a user logs in and their Firestore `users` document is missing, the system will immediately generate a clean, safe default profile for them. This safely repairs their account without ever overwriting existing user data.
+
+## Maintenance Range & Booking Restoration System
+
+### Multi-Day Maintenance Range Tool
+Admins and Moderators can put large sections of the calendar into maintenance across multiple days or weeks:
+1. Click **"🛠️ Maintenance Range"** in the calendar header.
+2. Click any slot to choose the **Start Time** (highlights with an orange pulse).
+3. Use `<` and `>` buttons to navigate across weeks if needed, then click the **End Time** slot.
+4. An interactive modal displays the total slot count and hours. Admins can enter an optional **Reason / Message for Users** (e.g. *"Stove replacement", "Chimney inspection"*).
+5. **Conflict Warning & Suspension**: If regular users had bookings within that window, a warning lists them. Instead of deleting user bookings, the system stores their data in a `suspendedBooking` state.
+
+### User Visibility
+- Maintenance slots display both "Maintenance" and the custom message tag directly on the calendar grid.
+- If a regular user clicks a maintenance slot, a modal appears explaining why the sauna is closed and showing the admin's message.
+
+### Shortening & Automatic Restoration
+- If maintenance finishes early, an Admin or Moderator can click the slot where work finished.
+- The modal provides two options:
+  - **"Shorten: Clear from here onwards"**: Clears maintenance from that specific slot to the end of the block.
+  - **"Clear entire maintenance"**: Reopens the entire block.
+- **Automatic Restoration**: Any reopened slots that previously had user bookings will **automatically restore** those users' original reservations right back onto the calendar! Purely empty maintenance slots return to "Available".
+- Operates smoothly without native browser `confirm()` or `alert()` dialogs to prevent browser popup suppression.
