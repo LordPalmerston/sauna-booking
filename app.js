@@ -596,6 +596,7 @@ function updateCalendarUI() {
                 }
             }
 
+            const b = bMap[date] && bMap[date][t];
             if (b) {
                 if (b.status === 'maintenance') {
                     el.classList.add('maintenance');
