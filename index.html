@@ -98,9 +98,18 @@
 
             <div class="calendar-container">
                 <div class="calendar-header">
-                    <button id="btn-prev-week" class="icon-btn">&larr;</button>
-                    <h3 id="current-week-label">Week ...</h3>
-                    <button id="btn-next-week" class="icon-btn">&rarr;</button>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <button id="btn-prev-week" class="icon-btn">&larr;</button>
+                        <h3 id="current-week-label" style="margin:0 15px;">Week ...</h3>
+                        <button id="btn-next-week" class="icon-btn">&rarr;</button>
+                    </div>
+                    <div>
+                        <button id="btn-maint-range" class="outline-btn hidden" style="border-color:var(--danger-color); color:var(--danger-color); font-weight:600; font-size:0.85rem; padding:6px 14px;">🛠️ Maintenance Range</button>
+                    </div>
+                </div>
+                <div id="maint-range-banner" class="hidden" style="background:#fff3cd; color:#856404; padding:12px 18px; border-radius:8px; margin:15px; border:1px solid #ffeeba; display:flex; justify-content:space-between; align-items:center;">
+                    <span id="maint-range-banner-text"><strong>🛠️ Maintenance Range Mode:</strong> Click any slot to choose the <strong>Start Time</strong>.</span>
+                    <button id="btn-cancel-maint-range" class="outline-btn" style="padding:4px 12px; font-size:0.8rem; background:white;">Cancel</button>
                 </div>
                 <div class="calendar-scroll">
                     <div class="calendar-grid" id="calendar-grid">
@@ -242,6 +251,15 @@
                 <select id="modal-end-time" style="width:100%; padding: 12px; border-radius:var(--border-radius); background:var(--bg-color); color:var(--text-main); border:1px solid var(--border-color);"></select>
             </div>
 
+            <div id="maint-info-container" style="margin: 15px 0; display: none;">
+                <div id="maint-user-box" style="background:#fff3cd; color:#856404; padding:12px; border-radius:6px; border:1px solid #ffeeba; font-size:0.9rem;">
+                    <strong>🛠️ Scheduled Maintenance</strong>
+                    <p id="maint-user-reason" style="margin:6px 0 0 0; font-size:0.85rem;"></p>
+                </div>
+                <div id="maint-restore-notice" style="display:none; background:#e8f4fd; color:#0c5460; padding:10px; border-radius:6px; margin-top:10px; font-size:0.85rem; border:1px solid #bee5eb;">
+                </div>
+            </div>
+
             <div class="modal-actions" style="margin-top:20px;">
                 <!-- Buttons injected securely via JS -->
             </div>
@@ -327,6 +345,33 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=1.13"></script>
+    <!-- Maintenance Range Confirmation Modal -->
+    <div id="maint-range-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3 style="color:var(--danger-color);">Set Maintenance Period</h3>
+            <p id="maint-range-summary" style="margin-top:10px; font-weight:600;"></p>
+            
+            <div class="input-group" style="margin: 15px 0;">
+                <label for="maint-reason-input">Reason / Message for Users</label>
+                <input type="text" id="maint-reason-input" placeholder="e.g. Chimney cleaning, Stove repair, Deep clean" style="width:100%; padding: 10px; border-radius:var(--border-radius); background:var(--bg-color); color:var(--text-main); border:1px solid var(--border-color); margin-top:5px;">
+                <span style="font-size:0.75rem; color:var(--text-muted);">This message will be shown to users who view or click these slots.</span>
+            </div>
+
+            <div id="maint-conflict-warning" style="display:none; background:#fff3cd; color:#856404; border:1px solid #ffeeba; padding:12px; border-radius:6px; font-size:0.85rem; margin-bottom:15px;">
+                <strong>⚠️ Warning: Conflicting Bookings Detected</strong>
+                <p style="margin: 5px 0;">The following user booking(s) fall within this period and will be suspended:</p>
+                <ul id="maint-conflict-list" style="margin: 5px 0 5px 20px; padding:0;"></ul>
+                <p style="margin:0; font-size:0.8rem; opacity:0.9;"><em>Note: These bookings will be automatically restored if maintenance finishes early and is shortened!</em></p>
+            </div>
+
+            <div class="modal-actions" style="margin-top:20px; display:flex; gap:10px;">
+                <button id="btn-confirm-maint-range" class="primary-btn" style="background:var(--danger-color);">Confirm Maintenance</button>
+                <button id="btn-close-maint-modal" class="outline-btn" style="margin-left: auto;">Cancel</button>
+            </div>
+            <p id="maint-range-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <script type="module" src="app.js?v=1.14"></script>
 </body>
 </html>

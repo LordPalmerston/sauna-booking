@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc, writeBatch, deleteField } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // === FIREBASE CONFIGURATION ===
 const firebaseConfig = {
@@ -62,6 +62,31 @@ const endTimeContainer = document.getElementById('end-time-container');
 const endTimeSelect = document.getElementById('modal-end-time');
 const membershipBadge = document.getElementById('membership-badge');
 const planModal = document.getElementById('plan-selection-modal');
+
+// Maintenance Range Elements & State
+const btnMaintRange = document.getElementById('btn-maint-range');
+const maintRangeBanner = document.getElementById('maint-range-banner');
+const maintRangeBannerText = document.getElementById('maint-range-banner-text');
+const btnCancelMaintRange = document.getElementById('btn-cancel-maint-range');
+const maintRangeModal = document.getElementById('maint-range-modal');
+const maintRangeSummary = document.getElementById('maint-range-summary');
+const maintReasonInput = document.getElementById('maint-reason-input');
+const maintConflictWarning = document.getElementById('maint-conflict-warning');
+const maintConflictList = document.getElementById('maint-conflict-list');
+const btnConfirmMaintRange = document.getElementById('btn-confirm-maint-range');
+const btnCloseMaintModal = document.getElementById('btn-close-maint-modal');
+const maintRangeError = document.getElementById('maint-range-error');
+
+let isMaintRangeMode = false;
+let maintRangeStartSlot = null; // { date, time }
+let pendingMaintRangeSlots = []; // [{ date, time }]
+let pendingMaintConflicts = []; // conflicting bookings
+
+function formatTime(date) {
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+}
 
 // === FEATURE TOGGLES ===
 const MEMBERSHIP_ENFORCEMENT_ENABLED = true; // Set to false to allow everyone to book and see the door code (except restricted users)
@@ -327,6 +352,7 @@ onAuthStateChanged(auth, async (user) => {
         } catch(e) { console.error(e); }
         
         btns.admin.classList.toggle('hidden', !['admin', 'moderator'].includes(currentRole));
+        if (btnMaintRange) btnMaintRange.classList.toggle('hidden', !['admin', 'moderator'].includes(currentRole));
         switchView('main');
         initCalendar();
         listenToMyBookings();
@@ -335,6 +361,8 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubscribeBookings) unsubscribeBookings();
         if (unsubscribeMyBookings) unsubscribeMyBookings();
         if (unsubscribeDoorCode) unsubscribeDoorCode();
+        if (btnMaintRange) btnMaintRange.classList.add('hidden');
+        exitMaintRangeMode();
         currentUser = null; currentRole = 'user'; currentMembership = null; currentDoorCode = "";
         switchView('auth');
     }
@@ -568,11 +596,12 @@ function updateCalendarUI() {
                 }
             }
 
-            const b = bMap[date] && bMap[date][t];
             if (b) {
                 if (b.status === 'maintenance') {
                     el.classList.add('maintenance');
-                    el.innerHTML = "Maintenance";
+                    const reasonTag = b.maintenanceReason ? `<span class="maint-reason-tag" title="${b.maintenanceReason}">${b.maintenanceReason}</span>` : '';
+                    el.innerHTML = `<strong>Maintenance</strong>${reasonTag}`;
+                    el.title = b.maintenanceReason ? `Maintenance: ${b.maintenanceReason}` : 'Scheduled Maintenance';
                 } else if (b.userId === currentUser.uid) {
                     el.classList.add('booked-me');
                     if (isPast && !['admin', 'moderator'].includes(currentRole)) {
@@ -600,11 +629,23 @@ function updateCalendarUI() {
             prevSlotEl = el;
         });
     });
+
+    if (isMaintRangeMode && maintRangeStartSlot) {
+        const startEl = document.querySelector(`.cal-slot[data-date="${maintRangeStartSlot.date}"][data-time="${maintRangeStartSlot.time}"]`);
+        if (startEl) startEl.classList.add('maint-range-start');
+    }
 }
 // === BOOKING ACTION (MODAL) ===
 window.handleSlotClick = function(el) {
     const date = el.getAttribute('data-date');
     const time = el.getAttribute('data-time');
+    
+    // Intercept if in Maintenance Range Mode
+    if (isMaintRangeMode) {
+        if (!['admin', 'moderator'].includes(currentRole)) return;
+        handleMaintRangeClick(date, time, el);
+        return;
+    }
     
     const now = new Date();
     const [y, m, dNum] = date.split('-').map(Number);
@@ -644,82 +685,129 @@ window.handleSlotClick = function(el) {
             } else { break; }
         }
         
-    // Trace forward
-    for (let i = startIndex + 1; i < 48; i++) {
-        const checkTime = allTimes[i];
-        const b = currentBookings.find(b => b.date === date && b.time === checkTime);
-        if (b && b.userId === existingBooking.userId && b.status === existingBooking.status) {
-            targetBlockIds.push(b.id);
-        } else { break; }
+        // Trace forward
+        for (let i = startIndex + 1; i < 48; i++) {
+            const checkTime = allTimes[i];
+            const b = currentBookings.find(b => b.date === date && b.time === checkTime);
+            if (b && b.userId === existingBooking.userId && b.status === existingBooking.status) {
+                targetBlockIds.push(b.id);
+            } else { break; }
+        }
     }
-}
 
-// Membership Enforcement
-if (!['admin', 'moderator'].includes(currentRole) && !existingBooking) {
-    if (currentMembership && currentMembership.isRemoved) {
-        modalTitle.textContent = "Access Restricted";
-        modalTime.textContent = "Your account access has been restricted.";
-        modalErr.textContent = "Please contact the administrator for support.";
+    // Informative modal for regular users clicking maintenance
+    if (existingBooking && existingBooking.status === 'maintenance' && !['admin', 'moderator'].includes(currentRole)) {
+        modalTitle.textContent = "Sauna Under Maintenance";
+        modalTime.textContent = `${formatEuroDate(date)} at ${time}`;
         endTimeContainer.style.display = "none";
-        document.querySelector('.modal-actions').innerHTML = `<button id="btn-close-membership" class="primary-btn">Close</button>`;
-        document.getElementById('btn-close-membership').addEventListener('click', () => modal.classList.remove('active'));
+        document.getElementById('maint-info-container').style.display = "block";
+        document.getElementById('maint-user-reason').textContent = existingBooking.maintenanceReason || "The sauna is scheduled for maintenance during this time.";
+        document.getElementById('maint-restore-notice').style.display = "none";
+        modalErr.textContent = "";
+        
+        const actionsContainer = document.querySelector('.modal-actions');
+        actionsContainer.innerHTML = `<button id="btn-close-maint-info" class="primary-btn">Close</button>`;
+        document.getElementById('btn-close-maint-info').addEventListener('click', () => modal.classList.remove('active'));
         modal.classList.add('active');
         return;
     }
-    
-    let isExpired = true;
-    if (!MEMBERSHIP_ENFORCEMENT_ENABLED) {
-        isExpired = false;
-    } else if (currentMembership) {
-        if (currentMembership.status === 'approved_pending_start') {
+
+    // Membership Enforcement
+    if (!['admin', 'moderator'].includes(currentRole) && !existingBooking) {
+        if (currentMembership && currentMembership.isRemoved) {
+            modalTitle.textContent = "Access Restricted";
+            modalTime.textContent = "Your account access has been restricted.";
+            modalErr.textContent = "Please contact the administrator for support.";
+            endTimeContainer.style.display = "none";
+            document.querySelector('.modal-actions').innerHTML = `<button id="btn-close-membership" class="primary-btn">Close</button>`;
+            document.getElementById('btn-close-membership').addEventListener('click', () => modal.classList.remove('active'));
+            modal.classList.add('active');
+            return;
+        }
+        
+        let isExpired = true;
+        if (!MEMBERSHIP_ENFORCEMENT_ENABLED) {
             isExpired = false;
-        } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
-            const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
-            if (exp > new Date()) isExpired = false;
+        } else if (currentMembership) {
+            if (currentMembership.status === 'approved_pending_start') {
+                isExpired = false;
+            } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
+                const exp = currentMembership.expiresAt.toDate ? currentMembership.expiresAt.toDate() : new Date(currentMembership.expiresAt);
+                if (exp > new Date()) isExpired = false;
+            }
+        }
+        
+        if (isExpired) {
+            if (currentMembership && currentMembership.status === 'pending_payment') {
+                alert("Your payment is currently pending approval by an admin. You will be able to book once it is approved.");
+            } else {
+                planModal.classList.add('active');
+                document.querySelectorAll('input[name="plan_choice"]').forEach(r => r.checked = false);
+                document.getElementById('payment-instructions').style.display = 'none';
+                document.getElementById('btn-submit-plan').disabled = true;
+                document.getElementById('plan-modal-error').textContent = "";
+            }
+            return;
         }
     }
-    
-    if (isExpired) {
-        if (currentMembership && currentMembership.status === 'pending_payment') {
-            alert("Your payment is currently pending approval by an admin. You will be able to book once it is approved.");
-        } else {
-            planModal.classList.add('active');
-            document.querySelectorAll('input[name="plan_choice"]').forEach(r => r.checked = false);
-            document.getElementById('payment-instructions').style.display = 'none';
-            document.getElementById('btn-submit-plan').disabled = true;
-            document.getElementById('plan-modal-error').textContent = "";
-        }
-        return;
-    }
-}
 
-// Reject foreign click normally
-const modalActions = document.querySelector('.modal-actions');
-modalActions.innerHTML = "";
+    // Reject foreign click normally
+    const modalActions = document.querySelector('.modal-actions');
+    modalActions.innerHTML = "";
 
-if (existingBooking && existingBooking.userId !== currentUser.uid && !['admin', 'moderator'].includes(currentRole) && existingBooking.status !== 'maintenance') {
+    if (existingBooking && existingBooking.userId !== currentUser.uid && !['admin', 'moderator'].includes(currentRole) && existingBooking.status !== 'maintenance') {
         modalErr.textContent = "Booked by another user.";
         return; 
     }
-    if (existingBooking && existingBooking.status === 'maintenance' && !['admin', 'moderator'].includes(currentRole)) {
-        modalErr.textContent = "Under maintenance.";
-        return;
-    }
 
     modalTime.textContent = `Starts at: ${date} ${time}`;
-    
     let primaryAction = "Confirm Booking";
     let extraBtnHTML = "";
 
     if (existingBooking) {
-        // We are clicking on an already booked slot (mostly to delete or convert to maintanance)
         endTimeContainer.style.display = "none";
+        
+        // Admin clicking on maintenance slot: Show Shorten or Remove Entire Block
+        if (existingBooking.status === 'maintenance') {
+            modalTitle.textContent = "Manage Maintenance";
+            document.getElementById('maint-info-container').style.display = "block";
+            document.getElementById('maint-user-reason').textContent = existingBooking.maintenanceReason || "Scheduled Maintenance";
+            
+            const restoreNotice = document.getElementById('maint-restore-notice');
+            let hasSuspended = targetBlockIds.some(id => {
+                const b = currentBookings.find(x => x.id === id);
+                return b && b.suspendedBooking;
+            });
+            
+            if (hasSuspended) {
+                restoreNotice.style.display = "block";
+                restoreNotice.innerHTML = "ℹ️ <strong>Restoration Notice:</strong> Shortening or removing this maintenance will automatically restore suspended user booking(s)!";
+            } else {
+                restoreNotice.style.display = "none";
+            }
+
+            const actionsContainer = document.querySelector('.modal-actions');
+            actionsContainer.innerHTML = `
+                <button id="btn-shorten-maint" class="primary-btn" style="background:#ff9800;">Shorten: Clear from here onwards</button>
+                <button id="btn-clear-all-maint" class="outline-btn" style="color:var(--danger-color); border-color:var(--danger-color);">Clear entire maintenance</button>
+                <button id="btn-cancel-action" class="outline-btn" style="margin-left: auto;">Cancel</button>
+            `;
+            
+            document.getElementById('btn-cancel-action').addEventListener('click', () => modal.classList.remove('active'));
+            document.getElementById('btn-shorten-maint').addEventListener('click', () => shortenMaintenanceBlock(date, time));
+            document.getElementById('btn-clear-all-maint').addEventListener('click', () => clearEntireMaintenanceBlock(targetBlockIds));
+            modal.classList.add('active');
+            return;
+        }
+
         modalTitle.textContent = "Manage Booking";
-        primaryAction = existingBooking.status === 'maintenance' ? "Remove Maintenance" : "Delete Booking";
-        if (['admin', 'moderator'].includes(currentRole) && existingBooking.status !== 'maintenance') {
+        document.getElementById('maint-info-container').style.display = "none";
+        primaryAction = "Delete Booking";
+        if (['admin', 'moderator'].includes(currentRole)) {
             extraBtnHTML = `<button id="btn-admin-maint" class="outline-btn" style="color:var(--danger-color)">Convert to Maintenance</button>`;
         }
     } else {
+        document.getElementById('maint-info-container').style.display = "none";
         // We are creating a NEW booking. Show end time dropdown.
         modalTitle.textContent = "Book Sauna Slot";
         endTimeContainer.style.display = "block";
@@ -996,12 +1084,31 @@ async function executeBookingAction() {
     if(document.getElementById('btn-action-primary')) document.getElementById('btn-action-primary').disabled = false;
 }
 
-// Admin specifically marking an entire block as maintenance uses the selected dropdown!
+// === MAINTENANCE MANAGEMENT & RESTORATION ===
+
 async function markAsMaintenance() {
     modalErr.textContent = "Processing maintenance...";
     try {
+        const reason = prompt("Enter a reason/message for this maintenance (optional):", "Scheduled Maintenance") || "Scheduled Maintenance";
         if (existingBooking) {
-            const promises = targetBlockIds.map(id => updateDoc(doc(db, "bookings", id), { status: 'maintenance', screenname: 'Admin', userId: 'ADMIN' }));
+            const promises = targetBlockIds.map(id => {
+                const b = currentBookings.find(x => x.id === id);
+                const updatePayload = {
+                    status: 'maintenance',
+                    maintenanceReason: reason,
+                    screenname: 'Maintenance',
+                    userId: 'ADMIN'
+                };
+                if (b && b.userId !== 'ADMIN') {
+                    updatePayload.suspendedBooking = {
+                        userId: b.userId,
+                        screenname: b.screenname,
+                        email: b.email || '',
+                        timestamp: b.timestamp || null
+                    };
+                }
+                return updateDoc(doc(db, "bookings", id), updatePayload);
+            });
             await Promise.all(promises);
         } else {
             const timesToBook = JSON.parse(endTimeSelect.value);
@@ -1010,9 +1117,10 @@ async function markAsMaintenance() {
                     date: targetSlot.date,
                     time: timeSlot,
                     userId: 'ADMIN',
-                    screenname: 'Admin',
+                    screenname: 'Maintenance',
                     email: '',
                     status: 'maintenance',
+                    maintenanceReason: reason,
                     timestamp: new Date()
                 });
             });
@@ -1020,6 +1128,311 @@ async function markAsMaintenance() {
         }
         modal.classList.remove('active');
     } catch(e) { modalErr.textContent = "Error: " + e.message; }
+}
+
+async function shortenMaintenanceBlock(date, time) {
+    if (!confirm(`Are you sure you want to shorten maintenance starting from ${formatEuroDate(date)} ${time}?\n\nAny slots from this time onwards will be reopened, and any previously suspended user bookings will be automatically restored!`)) {
+        return;
+    }
+    modalErr.textContent = "Shortening maintenance...";
+    try {
+        const [y, m, dNum] = date.split('-').map(Number);
+        const [hrs, mins] = time.split(':').map(Number);
+        const clickedDt = new Date(y, m - 1, dNum, hrs, mins);
+        
+        // Query maintenance bookings from clicked date onwards
+        const q = query(collection(db, "bookings"), where("date", ">=", date));
+        const snap = await getDocs(q);
+        const forwardMaintDocs = snap.docs.filter(d => {
+            const b = d.data();
+            if (b.status !== 'maintenance') return false;
+            const [by, bm, bd] = b.date.split('-').map(Number);
+            const [bhrs, bmins] = b.time.split(':').map(Number);
+            const bDt = new Date(by, bm - 1, bd, bhrs, bmins);
+            return bDt >= clickedDt;
+        });
+
+        // Sort chronologically
+        forwardMaintDocs.sort((a, b) => {
+            const da = a.data(), db = b.data();
+            const dta = new Date(`${da.date}T${da.time}`);
+            const dtb = new Date(`${db.date}T${db.time}`);
+            return dta - dtb;
+        });
+
+        // Collect contiguous chain from clickedDt
+        const docsToClear = [];
+        let expectedTime = clickedDt.getTime();
+        for (const docSnap of forwardMaintDocs) {
+            const b = docSnap.data();
+            const [by, bm, bd] = b.date.split('-').map(Number);
+            const [bhrs, bmins] = b.time.split(':').map(Number);
+            const bDt = new Date(by, bm - 1, bd, bhrs, bmins);
+            if (bDt.getTime() === expectedTime) {
+                docsToClear.push(docSnap);
+                expectedTime += 30 * 60 * 1000;
+            } else {
+                break;
+            }
+        }
+
+        const batch = writeBatch(db);
+        docsToClear.forEach(docSnap => {
+            const b = docSnap.data();
+            if (b.suspendedBooking) {
+                batch.update(docSnap.ref, {
+                    status: 'booked',
+                    userId: b.suspendedBooking.userId,
+                    screenname: b.suspendedBooking.screenname,
+                    email: b.suspendedBooking.email || '',
+                    timestamp: b.suspendedBooking.timestamp || new Date(),
+                    suspendedBooking: deleteField(),
+                    maintenanceReason: deleteField()
+                });
+            } else {
+                batch.delete(docSnap.ref);
+            }
+        });
+
+        await batch.commit();
+        modal.classList.remove('active');
+        alert("Maintenance successfully shortened! Original bookings were restored.");
+    } catch (e) {
+        modalErr.textContent = "Error: " + e.message;
+    }
+}
+
+async function clearEntireMaintenanceBlock(blockIds) {
+    if (!confirm("Are you sure you want to remove this maintenance block?\n\nAll slots will be reopened, and any suspended user bookings will be automatically restored!")) {
+        return;
+    }
+    modalErr.textContent = "Removing maintenance...";
+    try {
+        const batch = writeBatch(db);
+        for (const id of blockIds) {
+            const b = currentBookings.find(x => x.id === id);
+            const docRef = doc(db, "bookings", id);
+            if (b && b.suspendedBooking) {
+                batch.update(docRef, {
+                    status: 'booked',
+                    userId: b.suspendedBooking.userId,
+                    screenname: b.suspendedBooking.screenname,
+                    email: b.suspendedBooking.email || '',
+                    timestamp: b.suspendedBooking.timestamp || new Date(),
+                    suspendedBooking: deleteField(),
+                    maintenanceReason: deleteField()
+                });
+            } else {
+                batch.delete(docRef);
+            }
+        }
+        await batch.commit();
+        modal.classList.remove('active');
+        alert("Maintenance block removed and original bookings restored!");
+    } catch (e) {
+        modalErr.textContent = "Error: " + e.message;
+    }
+}
+
+// === TWO-CLICK MAINTENANCE RANGE MODE ===
+
+function toggleMaintRangeMode() {
+    if (!['admin', 'moderator'].includes(currentRole)) return;
+    if (isMaintRangeMode) {
+        exitMaintRangeMode();
+    } else {
+        enterMaintRangeMode();
+    }
+}
+
+function enterMaintRangeMode() {
+    isMaintRangeMode = true;
+    maintRangeStartSlot = null;
+    maintRangeBanner.classList.remove('hidden');
+    btnMaintRange.style.background = "var(--danger-color)";
+    btnMaintRange.style.color = "#fff";
+    btnMaintRange.textContent = "Exit Maintenance Range";
+    maintRangeBannerText.innerHTML = "<strong>🛠️ Maintenance Range Mode:</strong> Click any slot to choose the <strong>Start Time</strong>.";
+    document.querySelectorAll('.cal-slot').forEach(el => el.classList.remove('maint-range-start'));
+}
+
+function exitMaintRangeMode() {
+    isMaintRangeMode = false;
+    maintRangeStartSlot = null;
+    pendingMaintRangeSlots = [];
+    pendingMaintConflicts = [];
+    maintRangeBanner.classList.add('hidden');
+    btnMaintRange.style.background = "";
+    btnMaintRange.style.color = "var(--danger-color)";
+    btnMaintRange.textContent = "🛠️ Maintenance Range";
+    document.querySelectorAll('.cal-slot').forEach(el => el.classList.remove('maint-range-start'));
+}
+
+if (btnMaintRange) btnMaintRange.addEventListener('click', toggleMaintRangeMode);
+if (btnCancelMaintRange) btnCancelMaintRange.addEventListener('click', exitMaintRangeMode);
+if (btnCloseMaintModal) btnCloseMaintModal.addEventListener('click', () => maintRangeModal.classList.remove('active'));
+
+async function handleMaintRangeClick(date, time, el) {
+    if (!maintRangeStartSlot) {
+        maintRangeStartSlot = { date, time };
+        el.classList.add('maint-range-start');
+        maintRangeBannerText.innerHTML = `<strong>Start Selected:</strong> ${formatEuroDate(date)} ${time}. Now click the <strong>End Time</strong> (navigate weeks if needed) or click Cancel.`;
+        return;
+    }
+
+    // Second click: End time selected!
+    const endSlot = { date, time };
+    await openMaintRangeModal(maintRangeStartSlot, endSlot);
+}
+
+async function openMaintRangeModal(startSlot, endSlot) {
+    maintRangeError.textContent = "Analyzing range and checking for conflicts...";
+    btnConfirmMaintRange.disabled = true;
+    maintRangeModal.classList.add('active');
+
+    try {
+        const [sy, sm, sd] = startSlot.date.split('-').map(Number);
+        const [sh, smin] = startSlot.time.split(':').map(Number);
+        const [ey, em, ed] = endSlot.date.split('-').map(Number);
+        const [eh, emin] = endSlot.time.split(':').map(Number);
+
+        let dt1 = new Date(sy, sm - 1, sd, sh, smin);
+        let dt2 = new Date(ey, em - 1, ed, eh, emin);
+
+        if (dt2 < dt1) {
+            const temp = dt1;
+            dt1 = dt2;
+            dt2 = temp;
+        }
+
+        // Generate all 30-min slots inclusive
+        pendingMaintRangeSlots = [];
+        let cur = new Date(dt1);
+        while (cur <= dt2) {
+            pendingMaintRangeSlots.push({
+                date: formatDate(cur),
+                time: formatTime(cur)
+            });
+            cur = new Date(cur.getTime() + 30 * 60 * 1000);
+        }
+
+        const firstSlot = pendingMaintRangeSlots[0];
+        const lastSlot = pendingMaintRangeSlots[pendingMaintRangeSlots.length - 1];
+        const totalHours = (pendingMaintRangeSlots.length * 0.5).toFixed(1);
+
+        maintRangeSummary.innerHTML = `From <strong>${formatEuroDate(firstSlot.date)} ${firstSlot.time}</strong> to <strong>${formatEuroDate(lastSlot.date)} ${lastSlot.time}</strong><br><span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;">Total: ${pendingMaintRangeSlots.length} slots (${totalHours} hours)</span>`;
+
+        // Query Firestore for conflicts
+        const minD = firstSlot.date;
+        const maxD = lastSlot.date;
+        const q = query(collection(db, "bookings"), where("date", ">=", minD), where("date", "<=", maxD));
+        const snap = await getDocs(q);
+
+        const loadedBookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        pendingMaintConflicts = loadedBookings.filter(b => {
+            if (b.status === 'maintenance') return false;
+            return pendingMaintRangeSlots.some(s => s.date === b.date && s.time === b.time);
+        });
+
+        if (pendingMaintConflicts.length > 0) {
+            maintConflictWarning.style.display = "block";
+            maintConflictList.innerHTML = pendingMaintConflicts.map(b => `<li><strong>${b.screenname || 'User'}</strong>: ${formatEuroDate(b.date)} at ${b.time}</li>`).join('');
+        } else {
+            maintConflictWarning.style.display = "none";
+            maintConflictList.innerHTML = "";
+        }
+
+        maintRangeError.textContent = "";
+        btnConfirmMaintRange.disabled = false;
+    } catch (e) {
+        maintRangeError.textContent = "Error: " + e.message;
+        btnConfirmMaintRange.disabled = true;
+    }
+}
+
+if (btnConfirmMaintRange) {
+    btnConfirmMaintRange.addEventListener('click', async () => {
+        if (!pendingMaintRangeSlots || pendingMaintRangeSlots.length === 0) return;
+        maintRangeError.textContent = "Applying maintenance...";
+        btnConfirmMaintRange.disabled = true;
+
+        try {
+            const reason = (maintReasonInput.value || '').trim() || "Scheduled Maintenance";
+            
+            // Fetch all current bookings in the date range to match existing docs
+            const minD = pendingMaintRangeSlots[0].date;
+            const maxD = pendingMaintRangeSlots[pendingMaintRangeSlots.length - 1].date;
+            const q = query(collection(db, "bookings"), where("date", ">=", minD), where("date", "<=", maxD));
+            const snap = await getDocs(q);
+            const bookingMap = {};
+            snap.docs.forEach(d => {
+                const b = d.data();
+                bookingMap[`${b.date}_${b.time}`] = { id: d.id, ...b };
+            });
+
+            // Write in batches (up to 400 writes per batch)
+            const batches = [writeBatch(db)];
+            let opCount = 0;
+
+            for (const slot of pendingMaintRangeSlots) {
+                if (opCount >= 400) {
+                    batches.push(writeBatch(db));
+                    opCount = 0;
+                }
+                const curBatch = batches[batches.length - 1];
+                const key = `${slot.date}_${slot.time}`;
+                const existing = bookingMap[key];
+
+                if (existing) {
+                    const docRef = doc(db, "bookings", existing.id);
+                    if (existing.status !== 'maintenance') {
+                        // Suspend original user booking
+                        curBatch.update(docRef, {
+                            status: 'maintenance',
+                            maintenanceReason: reason,
+                            screenname: 'Maintenance',
+                            userId: 'ADMIN',
+                            suspendedBooking: {
+                                userId: existing.userId,
+                                screenname: existing.screenname,
+                                email: existing.email || '',
+                                timestamp: existing.timestamp || null
+                            }
+                        });
+                    } else {
+                        // Update existing maintenance reason
+                        curBatch.update(docRef, {
+                            maintenanceReason: reason
+                        });
+                    }
+                } else {
+                    // Create new maintenance slot
+                    const newRef = doc(collection(db, "bookings"));
+                    curBatch.set(newRef, {
+                        date: slot.date,
+                        time: slot.time,
+                        status: 'maintenance',
+                        maintenanceReason: reason,
+                        screenname: 'Maintenance',
+                        userId: 'ADMIN',
+                        timestamp: new Date()
+                    });
+                }
+                opCount++;
+            }
+
+            for (const b of batches) {
+                await b.commit();
+            }
+
+            maintRangeModal.classList.remove('active');
+            exitMaintRangeMode();
+            alert(`Successfully set maintenance across ${pendingMaintRangeSlots.length} slots!`);
+        } catch (e) {
+            maintRangeError.textContent = "Error: " + e.message;
+            btnConfirmMaintRange.disabled = false;
+        }
+    });
 }
 
 // === ADMIN PANEL ===
