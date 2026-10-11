@@ -1132,10 +1132,10 @@ async function markAsMaintenance() {
 }
 
 async function shortenMaintenanceBlock(date, time) {
-    if (!confirm(`Are you sure you want to shorten maintenance starting from ${formatEuroDate(date)} ${time}?\n\nAny slots from this time onwards will be reopened, and any previously suspended user bookings will be automatically restored!`)) {
-        return;
-    }
     modalErr.textContent = "Shortening maintenance...";
+    const shortenBtn = document.getElementById('btn-shorten-maint');
+    if (shortenBtn) shortenBtn.disabled = true;
+
     try {
         const [y, m, dNum] = date.split('-').map(Number);
         const [hrs, mins] = time.split(':').map(Number);
@@ -1197,17 +1197,17 @@ async function shortenMaintenanceBlock(date, time) {
 
         await batch.commit();
         modal.classList.remove('active');
-        alert("Maintenance successfully shortened! Original bookings were restored.");
     } catch (e) {
         modalErr.textContent = "Error: " + e.message;
+        if (shortenBtn) shortenBtn.disabled = false;
     }
 }
 
 async function clearEntireMaintenanceBlock(blockIds) {
-    if (!confirm("Are you sure you want to remove this maintenance block?\n\nAll slots will be reopened, and any suspended user bookings will be automatically restored!")) {
-        return;
-    }
     modalErr.textContent = "Removing maintenance...";
+    const clearBtn = document.getElementById('btn-clear-all-maint');
+    if (clearBtn) clearBtn.disabled = true;
+
     try {
         const batch = writeBatch(db);
         for (const id of blockIds) {
@@ -1229,9 +1229,9 @@ async function clearEntireMaintenanceBlock(blockIds) {
         }
         await batch.commit();
         modal.classList.remove('active');
-        alert("Maintenance block removed and original bookings restored!");
     } catch (e) {
         modalErr.textContent = "Error: " + e.message;
+        if (clearBtn) clearBtn.disabled = false;
     }
 }
 
@@ -1428,7 +1428,6 @@ if (btnConfirmMaintRange) {
 
             maintRangeModal.classList.remove('active');
             exitMaintRangeMode();
-            alert(`Successfully set maintenance across ${pendingMaintRangeSlots.length} slots!`);
         } catch (e) {
             maintRangeError.textContent = "Error: " + e.message;
             btnConfirmMaintRange.disabled = false;
