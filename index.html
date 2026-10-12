@@ -85,6 +85,12 @@
                 </div>
             </header>
 
+            <!-- Door Code Change Notification Banner -->
+            <div id="door-code-notification" style="display:none; background:#e8f5e9; color:#1b5e20; padding:14px 18px; border-radius:8px; margin:15px 15px 0 15px; border:1px solid #a5d6a7; display:none; justify-content:space-between; align-items:center; gap:12px;">
+                <span>🔑 <strong>The door code has been updated!</strong> The new code is: <strong id="door-code-notification-value" style="font-size:1.1rem; letter-spacing:0.1em;"></strong></span>
+                <button id="btn-dismiss-door-notification" class="outline-btn" style="padding:4px 12px; font-size:0.8rem; background:white; border-color:#1b5e20; color:#1b5e20; white-space:nowrap;">Got it ✓</button>
+            </div>
+
             <div id="my-upcoming-bookings" class="my-bookings-container">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
                     <h3 style="font-size: 1rem; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
@@ -372,6 +378,6 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=1.16"></script>
+    <script type="module" src="app.js?v=1.17"></script>
 </body>
 </html>

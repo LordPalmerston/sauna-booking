@@ -453,17 +453,57 @@ function initCalendar() {
 }
 
 // === DATABASE SYNC ===
+const doorCodeNotificationEl = document.getElementById('door-code-notification');
+const doorCodeNotificationValue = document.getElementById('door-code-notification-value');
+const btnDismissDoorNotification = document.getElementById('btn-dismiss-door-notification');
+
+if (btnDismissDoorNotification) {
+    btnDismissDoorNotification.addEventListener('click', () => {
+        if (doorCodeNotificationEl) doorCodeNotificationEl.style.display = 'none';
+        // Mark this code change as seen in localStorage
+        const seenTs = currentDoorCodeChangedAt ? currentDoorCodeChangedAt.getTime() : Date.now();
+        localStorage.setItem('seenDoorCodeChangedAt', seenTs.toString());
+    });
+}
+
+let currentDoorCodeChangedAt = null;
+
 function listenToDoorCode() {
     if (unsubscribeDoorCode) unsubscribeDoorCode();
     unsubscribeDoorCode = onSnapshot(doc(db, "settings", "door"), (docSnap) => {
         if (docSnap.exists()) {
-            currentDoorCode = docSnap.data().currentCode || "";
+            const data = docSnap.data();
+            currentDoorCode = data.currentCode || "";
+            const newChangedAt = data.changedAt ? (data.changedAt.toDate ? data.changedAt.toDate() : new Date(data.changedAt)) : null;
+            currentDoorCodeChangedAt = newChangedAt;
         } else {
             currentDoorCode = "";
+            currentDoorCodeChangedAt = null;
         }
         if (adminDoorCodeInput) adminDoorCodeInput.value = currentDoorCode;
         updateDoorCodeUI();
+        checkDoorCodeNotification();
     });
+}
+
+function checkDoorCodeNotification() {
+    if (!doorCodeNotificationEl || !doorCodeNotificationValue) return;
+    // Only show to non-admins who have door code access
+    if (['admin', 'moderator'].includes(currentRole)) return;
+    if (!currentDoorCodeChangedAt || !currentDoorCode) {
+        doorCodeNotificationEl.style.display = 'none';
+        return;
+    }
+
+    const seenTs = parseInt(localStorage.getItem('seenDoorCodeChangedAt') || '0', 10);
+    const changedTs = currentDoorCodeChangedAt.getTime();
+
+    if (changedTs > seenTs) {
+        doorCodeNotificationValue.textContent = currentDoorCode;
+        doorCodeNotificationEl.style.display = 'flex';
+    } else {
+        doorCodeNotificationEl.style.display = 'none';
+    }
 }
 
 function listenToMyBookings() {
@@ -2034,10 +2074,10 @@ if (btnUpdateDoorCode) {
         adminDoorCodeMsg.style.color = "var(--text-main)";
         
         try {
-            await setDoc(doc(db, "settings", "door"), { currentCode: newCode }, { merge: true });
-            adminDoorCodeMsg.textContent = "Code updated successfully!";
+            await setDoc(doc(db, "settings", "door"), { currentCode: newCode, changedAt: new Date() }, { merge: true });
+            adminDoorCodeMsg.textContent = "Code updated successfully! Users will be notified on their next login.";
             adminDoorCodeMsg.style.color = "var(--success-color)";
-            setTimeout(() => { adminDoorCodeMsg.style.display = 'none'; }, 3000);
+            setTimeout(() => { adminDoorCodeMsg.style.display = 'none'; }, 4000);
         } catch(e) {
             adminDoorCodeMsg.textContent = e.message;
             adminDoorCodeMsg.style.color = "var(--danger-color)";
