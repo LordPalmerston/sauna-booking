@@ -495,6 +495,23 @@ function checkDoorCodeNotification() {
         return;
     }
 
+    // Only show to users with an active paid membership
+    const hasActiveMembership = currentMembership &&
+        currentMembership.status === 'active' &&
+        !currentMembership.isRemoved &&
+        currentMembership.expiresAt &&
+        (() => {
+            const exp = currentMembership.expiresAt.toDate
+                ? currentMembership.expiresAt.toDate()
+                : new Date(currentMembership.expiresAt);
+            return exp > new Date();
+        })();
+
+    if (!hasActiveMembership) {
+        doorCodeNotificationEl.style.display = 'none';
+        return;
+    }
+
     const seenTs = parseInt(localStorage.getItem('seenDoorCodeChangedAt') || '0', 10);
     const changedTs = currentDoorCodeChangedAt.getTime();
 
