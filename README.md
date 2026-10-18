@@ -85,3 +85,12 @@ Admins and Moderators can put large sections of the calendar into maintenance ac
   - **"Clear entire maintenance"**: Reopens the entire block.
 - **Automatic Restoration**: Any reopened slots that previously had user bookings will **automatically restore** those users' original reservations right back onto the calendar! Purely empty maintenance slots return to "Available".
 - Operates smoothly without native browser `confirm()` or `alert()` dialogs to prevent browser popup suppression.
+
+## Door Code Change Notification System
+
+When an Admin or Moderator updates the sauna door code:
+- Firestore records the new `currentCode` and a `changedAt` timestamp under `settings/door`.
+- When an active, paid member logs in (or if they are already logged in when the code changes), an in-app banner notifies them:
+  > 🔑 **The door code has been updated! The new code is: [CODE]** `Got it ✓`
+- **Ongoing Paid Membership Required**: Users with no plan, expired plans, pending payments, or restricted accounts do not receive the notification (and the door code remains hidden from them).
+- **Dismissal Tracking**: Clicking "Got it ✓" dismisses the banner and records the seen timestamp per user account in browser storage so it is only presented once per code update.

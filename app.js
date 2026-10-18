@@ -240,6 +240,7 @@ function updateMembershipUI(membership) {
     }
     
     updateDoorCodeUI();
+    checkDoorCodeNotification();
 }
 
 function updateDoorCodeUI() {
@@ -362,6 +363,7 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubscribeMyBookings) unsubscribeMyBookings();
         if (unsubscribeDoorCode) unsubscribeDoorCode();
         if (btnMaintRange) btnMaintRange.classList.add('hidden');
+        if (doorCodeNotificationEl) doorCodeNotificationEl.style.display = 'none';
         exitMaintRangeMode();
         currentUser = null; currentRole = 'user'; currentMembership = null; currentDoorCode = "";
         switchView('auth');
@@ -460,8 +462,10 @@ const btnDismissDoorNotification = document.getElementById('btn-dismiss-door-not
 if (btnDismissDoorNotification) {
     btnDismissDoorNotification.addEventListener('click', () => {
         if (doorCodeNotificationEl) doorCodeNotificationEl.style.display = 'none';
-        // Mark this code change as seen in localStorage
         const seenTs = currentDoorCodeChangedAt ? currentDoorCodeChangedAt.getTime() : Date.now();
+        if (currentUser) {
+            localStorage.setItem(`seenDoorCodeChangedAt_${currentUser.uid}`, seenTs.toString());
+        }
         localStorage.setItem('seenDoorCodeChangedAt', seenTs.toString());
     });
 }
@@ -488,31 +492,43 @@ function listenToDoorCode() {
 
 function checkDoorCodeNotification() {
     if (!doorCodeNotificationEl || !doorCodeNotificationValue) return;
-    // Only show to non-admins who have door code access
-    if (['admin', 'moderator'].includes(currentRole)) return;
+    if (!currentUser) {
+        doorCodeNotificationEl.style.display = 'none';
+        return;
+    }
+    // Only show to non-admins who view user-facing pages
+    if (['admin', 'moderator'].includes(currentRole)) {
+        doorCodeNotificationEl.style.display = 'none';
+        return;
+    }
     if (!currentDoorCodeChangedAt || !currentDoorCode) {
         doorCodeNotificationEl.style.display = 'none';
         return;
     }
 
-    // Only show to users with an active paid membership
-    const hasActiveMembership = currentMembership &&
-        currentMembership.status === 'active' &&
-        !currentMembership.isRemoved &&
-        currentMembership.expiresAt &&
-        (() => {
+    // Only show to users with an ongoing paid membership:
+    // Either active with future expiresAt, or approved_pending_start
+    let hasPaidActiveMembership = false;
+    if (currentMembership && !currentMembership.isRemoved) {
+        if (currentMembership.status === 'approved_pending_start') {
+            hasPaidActiveMembership = true;
+        } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
             const exp = currentMembership.expiresAt.toDate
                 ? currentMembership.expiresAt.toDate()
                 : new Date(currentMembership.expiresAt);
-            return exp > new Date();
-        })();
+            if (exp > new Date()) {
+                hasPaidActiveMembership = true;
+            }
+        }
+    }
 
-    if (!hasActiveMembership) {
+    if (!hasPaidActiveMembership) {
         doorCodeNotificationEl.style.display = 'none';
         return;
     }
 
-    const seenTs = parseInt(localStorage.getItem('seenDoorCodeChangedAt') || '0', 10);
+    const seenKey = `seenDoorCodeChangedAt_${currentUser.uid}`;
+    const seenTs = parseInt(localStorage.getItem(seenKey) || localStorage.getItem('seenDoorCodeChangedAt') || '0', 10);
     const changedTs = currentDoorCodeChangedAt.getTime();
 
     if (changedTs > seenTs) {
