@@ -363,7 +363,7 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubscribeMyBookings) unsubscribeMyBookings();
         if (unsubscribeDoorCode) unsubscribeDoorCode();
         if (btnMaintRange) btnMaintRange.classList.add('hidden');
-        if (doorCodeNotificationEl) doorCodeNotificationEl.style.display = 'none';
+        hideDoorCodeToast();
         exitMaintRangeMode();
         currentUser = null; currentRole = 'user'; currentMembership = null; currentDoorCode = "";
         switchView('auth');
@@ -458,15 +458,33 @@ function initCalendar() {
 const doorCodeNotificationEl = document.getElementById('door-code-notification');
 const doorCodeNotificationValue = document.getElementById('door-code-notification-value');
 const btnDismissDoorNotification = document.getElementById('btn-dismiss-door-notification');
+const btnTestDoorNotification = document.getElementById('btn-test-door-notification');
+
+function showDoorCodeToast(code) {
+    if (!doorCodeNotificationEl || !doorCodeNotificationValue) return;
+    doorCodeNotificationValue.textContent = code;
+    doorCodeNotificationEl.classList.remove('hidden');
+}
+
+function hideDoorCodeToast() {
+    if (!doorCodeNotificationEl) return;
+    doorCodeNotificationEl.classList.add('hidden');
+}
 
 if (btnDismissDoorNotification) {
     btnDismissDoorNotification.addEventListener('click', () => {
-        if (doorCodeNotificationEl) doorCodeNotificationEl.style.display = 'none';
+        hideDoorCodeToast();
         const seenTs = currentDoorCodeChangedAt ? currentDoorCodeChangedAt.getTime() : Date.now();
         if (currentUser) {
             localStorage.setItem(`seenDoorCodeChangedAt_${currentUser.uid}`, seenTs.toString());
         }
         localStorage.setItem('seenDoorCodeChangedAt', seenTs.toString());
+    });
+}
+
+if (btnTestDoorNotification) {
+    btnTestDoorNotification.addEventListener('click', () => {
+        showDoorCodeToast(currentDoorCode || "1234");
     });
 }
 
@@ -493,37 +511,34 @@ function listenToDoorCode() {
 function checkDoorCodeNotification() {
     if (!doorCodeNotificationEl || !doorCodeNotificationValue) return;
     if (!currentUser) {
-        doorCodeNotificationEl.style.display = 'none';
-        return;
-    }
-    // Only show to non-admins who view user-facing pages
-    if (['admin', 'moderator'].includes(currentRole)) {
-        doorCodeNotificationEl.style.display = 'none';
+        hideDoorCodeToast();
         return;
     }
     if (!currentDoorCodeChangedAt || !currentDoorCode) {
-        doorCodeNotificationEl.style.display = 'none';
+        hideDoorCodeToast();
         return;
     }
 
-    // Only show to users with an ongoing paid membership:
+    // Admins and moderators always have door code access
+    let hasAccess = ['admin', 'moderator'].includes(currentRole);
+
+    // Regular users must have an ongoing paid membership:
     // Either active with future expiresAt, or approved_pending_start
-    let hasPaidActiveMembership = false;
-    if (currentMembership && !currentMembership.isRemoved) {
+    if (!hasAccess && currentMembership && !currentMembership.isRemoved) {
         if (currentMembership.status === 'approved_pending_start') {
-            hasPaidActiveMembership = true;
+            hasAccess = true;
         } else if (currentMembership.status === 'active' && currentMembership.expiresAt) {
             const exp = currentMembership.expiresAt.toDate
                 ? currentMembership.expiresAt.toDate()
                 : new Date(currentMembership.expiresAt);
             if (exp > new Date()) {
-                hasPaidActiveMembership = true;
+                hasAccess = true;
             }
         }
     }
 
-    if (!hasPaidActiveMembership) {
-        doorCodeNotificationEl.style.display = 'none';
+    if (!hasAccess) {
+        hideDoorCodeToast();
         return;
     }
 
@@ -532,10 +547,9 @@ function checkDoorCodeNotification() {
     const changedTs = currentDoorCodeChangedAt.getTime();
 
     if (changedTs > seenTs) {
-        doorCodeNotificationValue.textContent = currentDoorCode;
-        doorCodeNotificationEl.style.display = 'flex';
+        showDoorCodeToast(currentDoorCode);
     } else {
-        doorCodeNotificationEl.style.display = 'none';
+        hideDoorCodeToast();
     }
 }
 
@@ -2107,8 +2121,13 @@ if (btnUpdateDoorCode) {
         adminDoorCodeMsg.style.color = "var(--text-main)";
         
         try {
-            await setDoc(doc(db, "settings", "door"), { currentCode: newCode, changedAt: new Date() }, { merge: true });
-            adminDoorCodeMsg.textContent = "Code updated successfully! Users will be notified on their next login.";
+            const now = new Date();
+            await setDoc(doc(db, "settings", "door"), { currentCode: newCode, changedAt: now }, { merge: true });
+            if (currentUser) {
+                localStorage.setItem(`seenDoorCodeChangedAt_${currentUser.uid}`, now.getTime().toString());
+            }
+            localStorage.setItem('seenDoorCodeChangedAt', now.getTime().toString());
+            adminDoorCodeMsg.textContent = "Code updated successfully! Real-time alerts sent to active members.";
             adminDoorCodeMsg.style.color = "var(--success-color)";
             setTimeout(() => { adminDoorCodeMsg.style.display = 'none'; }, 4000);
         } catch(e) {

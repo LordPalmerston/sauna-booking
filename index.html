@@ -69,6 +69,18 @@
             </div>
         </main>
 
+        <!-- Floating Door Code Notification Toast -->
+        <div id="door-code-notification" class="door-code-toast hidden">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="font-size:1.5rem;">🔑</span>
+                <span style="font-size:0.95rem; line-height:1.4;">
+                    <strong>The door code has been updated!</strong><br>
+                    The new code is: <strong id="door-code-notification-value" style="font-size:1.15rem; letter-spacing:0.1em; color:#0d3d12;"></strong>
+                </span>
+            </div>
+            <button id="btn-dismiss-door-notification" class="outline-btn" style="padding:6px 14px; font-size:0.85rem; font-weight:600; background:white; border-color:#1b5e20; color:#1b5e20; white-space:nowrap; cursor:pointer;">Got it ✓</button>
+        </div>
+
         <!-- Main Booking View -->
         <main id="main-view" class="view">
             <header>
@@ -84,12 +96,6 @@
                     <button id="btn-logout" class="outline-btn" style="border-color:var(--danger-color); color:var(--danger-color);">Logout</button>
                 </div>
             </header>
-
-            <!-- Door Code Change Notification Banner -->
-            <div id="door-code-notification" style="display:none; background:#e8f5e9; color:#1b5e20; padding:14px 18px; border-radius:8px; margin:15px 15px 0 15px; border:1px solid #a5d6a7; justify-content:space-between; align-items:center; gap:12px;">
-                <span>🔑 <strong>The door code has been updated!</strong> The new code is: <strong id="door-code-notification-value" style="font-size:1.1rem; letter-spacing:0.1em;"></strong></span>
-                <button id="btn-dismiss-door-notification" class="outline-btn" style="padding:4px 12px; font-size:0.8rem; background:white; border-color:#1b5e20; color:#1b5e20; white-space:nowrap;">Got it ✓</button>
-            </div>
 
             <div id="my-upcoming-bookings" class="my-bookings-container">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
@@ -135,9 +141,10 @@
             <div class="admin-controls" style="background:var(--surface-color); padding: 20px; border-radius: var(--border-radius); display: flex; flex-direction: column; gap: 20px;">
                 <div class="admin-table-container">
                     <h3 style="color:var(--primary-color);">Door Access Control</h3>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input type="text" id="admin-door-code-input" placeholder="Loading current code..." style="padding: 10px; border-radius: var(--border-radius); border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); flex: 1;">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="admin-door-code-input" placeholder="Loading current code..." style="padding: 10px; border-radius: var(--border-radius); border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); flex: 1; min-width:140px;">
                         <button id="btn-update-door-code" class="primary-btn">Update Code</button>
+                        <button id="btn-test-door-notification" class="outline-btn" style="white-space:nowrap; font-weight:600;">🔔 Test Notification</button>
                     </div>
                     <p id="admin-door-code-msg" class="error-msg" style="color: var(--primary-color); display:none;"></p>
                 </div>
@@ -378,6 +385,6 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=1.18"></script>
+    <script type="module" src="app.js?v=1.19"></script>
 </body>
 </html>

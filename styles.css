@@ -288,3 +288,37 @@ header { display: flex; justify-content: space-between; align-items: center; mar
     white-space: nowrap;
     font-weight: normal;
 }
+
+/* Floating Door Code Notification Toast */
+.door-code-toast {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    width: 90%;
+    max-width: 520px;
+    background: #e8f5e9;
+    color: #1b5e20;
+    padding: 14px 20px;
+    border-radius: 12px;
+    border: 1px solid #81c784;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    animation: slideDownToast 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownToast {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -25px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+

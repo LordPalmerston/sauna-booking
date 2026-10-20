@@ -39,8 +39,9 @@ A loading interceptor UI aggressively intercepts the screen while the Firebase s
 - **Non-blocking UX:** The entire flow runs without native browser popups to ensure smooth operation across all devices.
 
 ### 7. Door Code Change Notification
-- **Targeted Notification**: When an Admin or Moderator updates the door code, a dismissible banner notifies users on their next login (or in real-time if currently logged in).
-- **Protected to Ongoing Paid Members**: Only accounts with an ongoing paid membership (`active` with valid expiry, or `approved_pending_start`) see the notification and new code. Unapproved, expired, or non-paying users will not receive the notification banner (and their header badge continues to say "Door Code: Hidden").
+- **Targeted Notification**: When an Admin or Moderator updates the door code, a prominent floating toast alert smoothly slides down from the top of the viewport in real time (for logged-in users) or upon their next login.
+- **Protected to Ongoing Paid Members**: Only accounts with an ongoing paid membership (`active` with valid expiry, or `approved_pending_start`), plus admins and moderators, see the notification and new code. Unapproved, expired, or non-paying users will not receive the notification banner (and their header badge continues to say "Door Code: Hidden").
+- **Admin Testing Tool**: A dedicated **"🔔 Test Notification"** button in the Admin Dashboard allows admins to preview the exact alert at any time on demand.
 - **Account-Aware Dismissal**: Acknowledging the banner records the seen timestamp per user account in local storage, preventing duplicate alerts across shared or multi-account devices.
 
 ---
