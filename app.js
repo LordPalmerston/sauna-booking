@@ -21,6 +21,16 @@ const INVITE_CODE_USER = "TRANHOLMEN";
 const INVITE_CODE_ADMIN = "ADMIN777";
 console.log("🔥 Sauna Booking App v1.13 Loaded (Coupling Feature Active!)");
 
+// Clean up any legacy or cached "Live" badge elements from browser cache
+function purgeLiveIndicators() {
+    document.querySelectorAll('.user-controls span').forEach(el => {
+        if (el.textContent && el.textContent.toLowerCase().includes('live')) {
+            el.remove();
+        }
+    });
+}
+purgeLiveIndicators();
+
 let currentUser = null;
 let currentRole = 'user';
 let currentMembership = null; // { expiresAt, isRemoved }
@@ -355,6 +365,7 @@ onAuthStateChanged(auth, async (user) => {
         btns.admin.classList.toggle('hidden', !['admin', 'moderator'].includes(currentRole));
         if (btnMaintRange) btnMaintRange.classList.toggle('hidden', !['admin', 'moderator'].includes(currentRole));
         switchView('main');
+        purgeLiveIndicators();
         initCalendar();
         listenToMyBookings();
         listenToDoorCode();
