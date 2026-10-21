@@ -214,15 +214,25 @@ function updateMembershipUI(membership) {
     if (!membershipBadge) return;
     membershipBadge.className = 'badge';
     
+    // Admin and Moderator roles override membership status badge
+    if (['admin', 'moderator'].includes(currentRole)) {
+        membershipBadge.textContent = currentRole === 'admin' ? "Admin" : "Moderator";
+        membershipBadge.classList.add('active');
+        updateDoorCodeUI();
+        checkDoorCodeNotification();
+        return;
+    }
+
     if (!MEMBERSHIP_ENFORCEMENT_ENABLED) {
         if (membership && membership.isRemoved) {
             membershipBadge.textContent = "Access Restricted";
             membershipBadge.classList.add('expired');
         } else {
-            membershipBadge.textContent = "Unlimited Access";
+            membershipBadge.textContent = "Active";
             membershipBadge.classList.add('active');
         }
         updateDoorCodeUI();
+        checkDoorCodeNotification();
         return;
     }
     
@@ -233,7 +243,7 @@ function updateMembershipUI(membership) {
         membershipBadge.textContent = "Pending Approval";
         membershipBadge.classList.add('expired');
     } else if (membership && membership.status === 'approved_pending_start') {
-        membershipBadge.textContent = "Ready to Start";
+        membershipBadge.textContent = "Active";
         membershipBadge.classList.add('active');
     } else if (membership && membership.expiresAt) {
         const exp = membership.expiresAt.toDate ? membership.expiresAt.toDate() : new Date(membership.expiresAt);
