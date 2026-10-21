@@ -93,7 +93,7 @@
                     <button id="btn-edit-name" class="icon-btn" style="border:none; background:transparent; padding:0; cursor:pointer;" title="Edit Screenname">✏️</button>
                     <span id="membership-badge" class="badge"></span>
                     <span id="door-code-badge" class="badge none" style="margin-left: 10px;">Door Code: <span id="door-code-value">Hidden</span></span>
-                    <a href="mailto:saunatranholmen@gmail.com" class="outline-btn" style="text-decoration:none; display:inline-block; margin-left: 10px;">Contact Admin</a>
+                    <button id="btn-contact-admin" class="outline-btn" style="margin-left: 10px;">Contact Admin</button>
                     <button id="btn-admin-panel" class="hidden outline-btn">Admin</button>
                     <button id="btn-logout" class="outline-btn" style="border-color:var(--danger-color); color:var(--danger-color);">Logout</button>
                 </div>
@@ -387,6 +387,28 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=1.22"></script>
+    <!-- Contact Admin Modal -->
+    <div id="contact-modal" class="modal">
+        <div class="modal-content" style="max-width: 420px; text-align: center;">
+            <h3 style="margin-bottom: 8px;">Contact Administrator</h3>
+            <p style="color:var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+                For sauna questions, memberships, or maintenance issues:
+            </p>
+            
+            <div style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:var(--border-radius); padding:12px 14px; margin-bottom: 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <span id="contact-email-text" style="font-weight:600; font-size:0.95rem; user-select:all; word-break:break-all;">saunatranholmen@gmail.com</span>
+                <button id="btn-copy-contact-email" class="primary-btn" style="padding:6px 14px; font-size:0.85rem; font-weight:600; white-space:nowrap; cursor:pointer;">📋 Copy</button>
+            </div>
+            
+            <p id="copy-feedback-msg" style="color:var(--success-color); font-size:0.85rem; font-weight:600; min-height:1.2em; margin-bottom:15px;"></p>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 10px; border-top:1px solid var(--border-color); padding-top:15px;">
+                <a href="mailto:saunatranholmen@gmail.com" style="color:var(--primary-color); font-size:0.85rem; text-decoration:underline;">Open mail client</a>
+                <button id="btn-close-contact-modal" class="outline-btn" style="padding:6px 16px;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js?v=1.23"></script>
 </body>
 </html>

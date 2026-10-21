@@ -2157,3 +2157,68 @@ if (btnUpdateDoorCode) {
         }
     });
 }
+
+// === CONTACT ADMIN MODAL ===
+const contactModal = document.getElementById('contact-modal');
+const btnContactAdmin = document.getElementById('btn-contact-admin');
+const btnCloseContactModal = document.getElementById('btn-close-contact-modal');
+const btnCopyContactEmail = document.getElementById('btn-copy-contact-email');
+const contactEmailText = document.getElementById('contact-email-text');
+const copyFeedbackMsg = document.getElementById('copy-feedback-msg');
+
+if (btnContactAdmin && contactModal) {
+    btnContactAdmin.addEventListener('click', () => {
+        if (copyFeedbackMsg) copyFeedbackMsg.textContent = "";
+        if (btnCopyContactEmail) btnCopyContactEmail.textContent = "📋 Copy";
+        contactModal.classList.add('active');
+    });
+}
+
+if (btnCloseContactModal && contactModal) {
+    btnCloseContactModal.addEventListener('click', () => {
+        contactModal.classList.remove('active');
+    });
+}
+
+if (contactModal) {
+    contactModal.addEventListener('click', (e) => {
+        if (e.target === contactModal) {
+            contactModal.classList.remove('active');
+        }
+    });
+}
+
+if (btnCopyContactEmail && contactEmailText) {
+    btnCopyContactEmail.addEventListener('click', async () => {
+        const email = contactEmailText.textContent.trim();
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(email);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = email;
+                textArea.style.position = "fixed";
+                textArea.style.opacity = "0";
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            if (btnCopyContactEmail) btnCopyContactEmail.textContent = "Copied! ✓";
+            if (copyFeedbackMsg) {
+                copyFeedbackMsg.textContent = "Email copied to clipboard!";
+                copyFeedbackMsg.style.color = "var(--success-color)";
+            }
+            setTimeout(() => {
+                if (btnCopyContactEmail) btnCopyContactEmail.textContent = "📋 Copy";
+                if (copyFeedbackMsg) copyFeedbackMsg.textContent = "";
+            }, 3000);
+        } catch (err) {
+            if (copyFeedbackMsg) {
+                copyFeedbackMsg.textContent = "Please select and copy manually.";
+                copyFeedbackMsg.style.color = "var(--danger-color)";
+            }
+        }
+    });
+}
+
